@@ -1,9 +1,12 @@
 {
   "domain": "organic_box",
   "name": "Organic Box",
-  "version": "0.1.0",
-  "requirements": ["aiohttp"],
-  "dependencies": [],
   "codeowners": ["@usimd"],
+  "dependencies": [],
+  "documentation": "https://github.com/usimd/homeassistant-organic-box-providers",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "version": "0.1.0",
+  "requirements": [],
   "config_flow": true
 }
