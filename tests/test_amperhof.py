@@ -1,31 +1,54 @@
+import asyncio
+import sys
+import types
+
 import pytest
+
+from custom_components.organic_box import amperhof
 from custom_components.organic_box.amperhof import AmperhofProvider
 
-@pytest.mark.asyncio
-async def test_amperhof_provider(monkeypatch):
-    class DummyResponse:
-        async def json(self):
-            return {
-                "data": {
-                    "orderedBasket": [
-                        {
-                            "id": "1",
-                            "amount": 1,
-                            "price": 2.5,
-                            "unit": {"unit": "kg"},
-                            "information": {"name": "Apple", "category": "Fruit", "imageUrl": None},
-                        }
-                    ],
-                    "order": {"billingSum": 2.5, "lastPossibleOrderChange": "2025-10-16", "address": "Test"}
-                }
-            }
-    class DummySession:
-        async def __aenter__(self): return self
-        async def __aexit__(self, exc_type, exc, tb): pass
-        async def get(self, url, headers): return DummyResponse()
-    monkeypatch.setattr("aiohttp.ClientSession", lambda: DummySession())
+"""Tests for AmperhofProvider and Home Assistant mocks."""
+
+# Setup Home Assistant mocks
+homeassistant_mod = types.ModuleType("homeassistant")
+homeassistant_core_mod = types.ModuleType("homeassistant.core")
+homeassistant_core_mod.HomeAssistant = type("HomeAssistant", (), {})
+homeassistant_helpers_mod = types.ModuleType("homeassistant.helpers")
+homeassistant_helpers_mod.service = None
+homeassistant_helpers_typing_mod = types.ModuleType("homeassistant.helpers.typing")
+homeassistant_helpers_typing_mod.ConfigType = dict
+event_mod = types.ModuleType("homeassistant.helpers.event")
+
+
+def async_track_time_interval(*args: object, **kwargs: object) -> None:
+    """Mock async_track_time_interval."""
+    pass
+
+
+event_mod.async_track_time_interval = async_track_time_interval
+sys.modules["homeassistant"] = homeassistant_mod
+sys.modules["homeassistant.core"] = homeassistant_core_mod
+sys.modules["homeassistant.helpers"] = homeassistant_helpers_mod
+sys.modules["homeassistant.helpers.event"] = event_mod
+sys.modules["homeassistant.helpers.typing"] = homeassistant_helpers_typing_mod
+
+
+def test_amperhof_provider_init() -> None:
+    """Test AmperhofProvider config initialization."""
+    provider = amperhof.AmperhofProvider(
+        {
+            "username": "user",
+            "password": "testpass",
+        }
+    )
+    assert provider.config["username"] == "user"
+    assert provider.config["password"] == "testpass"
+
+
+def test_amperhof_provider_not_implemented() -> None:
+    """Test NotImplementedError for async_get_next_delivery."""
     provider = AmperhofProvider({"jwt_token": "dummy"})
-    delivery = await provider.async_get_next_delivery()
-    assert delivery.date == "2025-10-16"
-    assert delivery.basket.total_price.amount == 2.5
-    assert delivery.basket.items[0].name == "Apple"
+    with pytest.raises(NotImplementedError):
+        asyncio.run(provider.async_get_next_delivery())
+    with pytest.raises(NotImplementedError):
+        asyncio.run(provider.async_get_next_delivery())

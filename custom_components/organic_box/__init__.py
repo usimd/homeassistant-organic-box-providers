@@ -1,44 +1,65 @@
-
 """Organic Box Home Assistant Integration."""
 
 import logging
 from datetime import timedelta
+
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers import service
-from .const import DOMAIN
+from homeassistant.helpers.typing import ConfigType
+
 from .amperhof import AmperhofProvider
+from .const import DOMAIN
 
 SCAN_INTERVAL = timedelta(hours=1)
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+
+async def async_setup(hass: HomeAssistant, _config: ConfigType = None) -> bool:
     """Set up the Organic Box integration."""
     hass.data.setdefault(DOMAIN, {})
 
-    async def update_basket_service(call):
+    async def update_basket_service(call: object) -> None:
+        """Service to update basket."""
+        del call
         await async_update_basket(hass)
 
-    async def align_shopping_list_service(call):
+    async def align_shopping_list_service(call: object) -> None:
+        """Service to align shopping list."""
+        del call
         await async_align_shopping_list(hass)
 
-    hass.services.async_register(DOMAIN, "update_basket", update_basket_service)
-    hass.services.async_register(DOMAIN, "align_shopping_list", align_shopping_list_service)
+        hass.services.async_register(
+            DOMAIN,
+            "update_basket",
+            update_basket_service,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            "align_shopping_list",
+            align_shopping_list_service,
+        )
 
-    async_track_time_interval(hass, lambda now: hass.async_create_task(async_update_basket(hass)), SCAN_INTERVAL)
+    async_track_time_interval(
+        hass,
+        lambda _: hass.async_create_task(async_update_basket(hass)),
+        SCAN_INTERVAL,
+    )
     return True
 
-async def async_update_basket(hass: HomeAssistant):
-    # Example: Only Amperhof for now, extend for other providers
+
+async def async_update_basket(hass: HomeAssistant) -> None:
+    """Update basket from provider and store deliveries."""
     config = hass.data[DOMAIN].get("config", {})
     provider = AmperhofProvider(config.get("amperhof", {}))
-    delivery = await provider.async_get_next_delivery()
-    hass.data[DOMAIN]["delivery"] = delivery
-    _LOGGER.info("Organic Box basket updated.")
+    deliveries = await provider.async_get_upcoming_deliveries()
+    hass.data[DOMAIN]["deliveries"] = deliveries
+    _LOGGER.info(
+        f"Organic Box deliveries updated: {len(deliveries)} found.",
+    )
 
-async def async_align_shopping_list(hass: HomeAssistant):
-    # Align planned basket with Home Assistant's To Do list (shopping_list)
+
+async def async_align_shopping_list(hass: HomeAssistant) -> None:
+    """Align planned basket with Home Assistant's To Do list (shopping_list)."""
     delivery = hass.data[DOMAIN].get("delivery")
     if not delivery:
         _LOGGER.warning("No delivery data available to align shopping list.")
@@ -52,7 +73,13 @@ async def async_align_shopping_list(hass: HomeAssistant):
         return
     todo_items = state_obj.attributes.get("items", [])
     # Remove items from To Do list that are present in the basket
-    items_to_remove = [item for item in todo_items if item.get("name", "").lower() in basket_items]
+    items_to_remove = [
+        item for item in todo_items if item.get("name", "").lower() in basket_items
+    ]
     for item in items_to_remove:
-        await hass.services.async_call("todo", "remove_item", {"entity_id": todo_entity_id, "item": item["name"]})
+        await hass.services.async_call(
+            "todo",
+            "remove_item",
+            {"entity_id": todo_entity_id, "item": item["name"]},
+        )
     _LOGGER.info(f"Removed {len(items_to_remove)} items from shopping list.")

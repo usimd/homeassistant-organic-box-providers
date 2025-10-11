@@ -1,5 +1,16 @@
+[tool.ruff]
+line-length = 88
+lint.ignore = ["S101"]
+exclude = ["__pycache__", "build", "dist", ".venv", "venv"]
+
+[tool.ruff.format]
+quote-style = "double"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]
 
 [build-system]
 requires = ["setuptools", "wheel"]

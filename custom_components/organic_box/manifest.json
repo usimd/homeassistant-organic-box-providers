@@ -4,6 +4,6 @@
   "version": "0.1.0",
   "requirements": ["aiohttp"],
   "dependencies": [],
-  "codeowners": ["@yourgithub"],
-  "config_flow": false
+  "codeowners": ["@usimd"],
+  "config_flow": true
 }

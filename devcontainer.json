@@ -18,5 +18,5 @@
       ]
     }
   },
-  "postCreateCommand": "uv pip install -r requirements.txt"
+  "postCreateCommand": "uv pip install -r requirements.txt && pre-commit install"
 }
