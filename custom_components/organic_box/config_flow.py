@@ -7,10 +7,11 @@ from .const import DOMAIN
 PROVIDERS = {
     "amperhof": {
         "fields": {
-            "jwt_token": str
+            "username": str,
+            "password": str
         },
         "label": "Amperhof (Germany)",
-        "description": "Requires JWT token for authentication."
+        "description": "Requires username and password for authentication."
     },
     # Example for another provider:
     # "otherbox": {
