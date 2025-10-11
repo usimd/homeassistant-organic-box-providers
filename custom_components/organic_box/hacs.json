@@ -1,0 +1,12 @@
+{
+  "name": "Organic Box",
+  "description": "Query organic food box delivery services for next delivery and planned basket. Plugin architecture for easy extension.",
+  "render_readme": true,
+  "domains": ["sensor"],
+  "country": "de",
+  "codeowners": ["@usimd"],
+  "homeassistant": "2023.0.0",
+  "iot_class": "cloud_polling",
+  "integration_type": "integration",
+  "version": "0.1.0"
+}
