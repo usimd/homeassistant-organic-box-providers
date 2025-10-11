@@ -16,6 +16,10 @@ This custom integration enables Home Assistant to query various organic food box
 - Optional: Align planned basket with Home Assistant's To Do list (shopping list)
 
 ## Installation via HACS
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=usimd&repository=homeassistant-organic-box-providers&category=integration)
+
+
 1. Go to HACS > Integrations > Custom Repositories.
 2. Add this repository URL: `https://github.com/usimd/homeassistant-organic-box-addon` as a "Integration".
 3. Install "Organic Box" from HACS.
