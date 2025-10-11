@@ -1,0 +1,9 @@
+{
+  "domain": "organic_box",
+  "name": "Organic Box",
+  "version": "0.1.0",
+  "requirements": ["aiohttp"],
+  "dependencies": [],
+  "codeowners": ["@yourgithub"],
+  "config_flow": false
+}

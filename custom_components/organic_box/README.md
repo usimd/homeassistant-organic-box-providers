@@ -1,9 +1,4 @@
-
 # Organic Box Home Assistant Integration
-
-<p align="center">
-	<img src="https://raw.githubusercontent.com/usimd/homeassistant-organic-box-addon/main/custom_components/organic_box/icon.png" width="128" alt="Organic Box Icon"/>
-</p>
 
 This custom integration enables Home Assistant to query various organic food box delivery services for their next scheduled delivery and planned basket contents. It is designed with a plugin architecture, making it easy to add new providers.
 
@@ -15,15 +10,7 @@ This custom integration enables Home Assistant to query various organic food box
 - Service to manually update basket/delivery
 - Optional: Align planned basket with Home Assistant's To Do list (shopping list)
 
-## Installation via HACS
-1. Go to HACS > Integrations > Custom Repositories.
-2. Add this repository URL: `https://github.com/usimd/homeassistant-organic-box-addon` as a "Integration".
-3. Install "Organic Box" from HACS.
-4. Restart Home Assistant.
-5. Add the integration via the UI ("Add Integration" > "Organic Box").
-6. Select your provider and enter required credentials (JWT token for Amperhof).
-
-## Manual Installation
+## Installation
 1. Copy the `organic_box` folder into your Home Assistant `custom_components` directory.
 2. Restart Home Assistant.
 3. Add the integration via the UI ("Add Integration" > "Organic Box").
@@ -32,8 +19,8 @@ This custom integration enables Home Assistant to query various organic food box
 ## Configuration Example
 ```yaml
 organic_box:
-	amperhof:
-		jwt_token: "your_jwt_token_here"
+  amperhof:
+    jwt_token: "your_jwt_token_here"
 ```
 
 ## Adding Providers

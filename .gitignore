@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+
+# VS Code
+.vscode/
+
+# Devcontainer
+.devcontainer/
+
+# Home Assistant
+home-assistant.log
+
+# Test & Coverage
+.coverage
+htmlcov/
+
+# HACS
+custom_components/organic_box/__pycache__/
+
+# Misc
+.DS_Store
+*.swp
+*.swo
