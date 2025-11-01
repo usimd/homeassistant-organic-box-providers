@@ -1,3 +1,8 @@
+[project]
+name = ""
+version = "0.0.1"
+dependencies = ["pyoekoboxonline==0.1.0b3"]
+
 [tool.ruff]
 line-length = 88
 lint.ignore = ["S101"]
@@ -8,9 +13,15 @@ quote-style = "double"
 skip-magic-trailing-comma = false
 line-ending = "lf"
 
+[tool.uv]
+package = false
+
 [tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
 asyncio_mode = "auto"
-pythonpath = ["."]
+pythonpath = [".", "custom_components/organic_box"]
 
 [build-system]
 requires = ["setuptools", "wheel"]

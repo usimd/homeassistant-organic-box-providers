@@ -46,9 +46,7 @@ class OekoBoxProvider(OrganicBoxProvider):
 
             # Initialize client with shop_id, username, and password
             self._client = OekoBoxOnline(
-                shop_id=self._shop_id,
-                username=self._username,
-                password=self._password
+                shop_id=self._shop_id, username=self._username, password=self._password
             )
 
             # Perform login (guest=False for user authentication)
@@ -122,8 +120,12 @@ class OekoBoxProvider(OrganicBoxProvider):
 
                 # Find orders matching the delivery date
                 from pyoekoboxonline import Order
+
                 for order in orders:
-                    if isinstance(order, Order) and order.ddate == next_ddate.delivery_date:
+                    if (
+                        isinstance(order, Order)
+                        and order.ddate == next_ddate.delivery_date
+                    ):
                         # Get items for this order
                         try:
                             order_items = await self._client.get_order_items(order.id)
@@ -137,23 +139,20 @@ class OekoBoxProvider(OrganicBoxProvider):
                                 item_id = None
 
                                 # Try to get attributes (handles both dict and object)
-                                if hasattr(order_item, 'item_id'):
+                                if hasattr(order_item, "item_id"):
                                     item_id = order_item.item_id
-                                if hasattr(order_item, 'amount'):
+                                if hasattr(order_item, "amount"):
                                     quantity = float(order_item.amount or 0)
-                                if hasattr(order_item, 'unit'):
+                                if hasattr(order_item, "unit"):
                                     unit = order_item.unit
 
                                 # Try to get the item details for the name
                                 if item_id:
-                                    try:
-                                        item_details = await self._client.get_item(item_id)
-                                        if hasattr(item_details, 'name'):
-                                            item_name = item_details.name
-                                        elif isinstance(item_details, dict):
-                                            item_name = item_details.get('name', 'Unknown')
-                                    except:
-                                        pass  # If we can't get item details, use default
+                                    item_details = await self._client.get_item(item_id)
+                                    if hasattr(item_details, "name"):
+                                        item_name = item_details.name
+                                    elif isinstance(item_details, dict):
+                                        item_name = item_details.get("name", "Unknown")
 
                                 item = BasketItem(
                                     name=item_name,
@@ -163,7 +162,11 @@ class OekoBoxProvider(OrganicBoxProvider):
                                 )
                                 items.append(item)
                         except Exception as item_err:
-                            _LOGGER.warning("Failed to get order items for order %s: %s", order.id, item_err)
+                            _LOGGER.warning(
+                                "Failed to get order items for order %s: %s",
+                                order.id,
+                                item_err,
+                            )
 
             # Convert date to datetime if found
             delivery_datetime = None
@@ -184,4 +187,3 @@ class OekoBoxProvider(OrganicBoxProvider):
             await self._client.close()
             self._client = None
         self._authenticated = False
-

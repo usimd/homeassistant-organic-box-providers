@@ -1,17 +1,7 @@
 """Tests for the Organic Box models."""
 
-import sys
-from pathlib import Path
 from datetime import datetime
-
-# Add the component directory to the path
-component_path = Path(__file__).parent.parent / "custom_components" / "organic_box"
-sys.path.insert(0, str(component_path))
-
-import models
-
-BasketItem = models.BasketItem
-DeliveryInfo = models.DeliveryInfo
+from custom_components.organic_box.models import BasketItem, DeliveryInfo
 
 
 def test_basket_item_creation():

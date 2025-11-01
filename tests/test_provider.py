@@ -1,19 +1,8 @@
 """Tests for the abstract provider base class."""
 
-import sys
-from pathlib import Path
 import pytest
-
-# Add the component directory to the path
-component_path = Path(__file__).parent.parent / "custom_components" / "organic_box"
-sys.path.insert(0, str(component_path))
-
-import models
-import provider
-
-BasketItem = models.BasketItem
-DeliveryInfo = models.DeliveryInfo
-OrganicBoxProvider = provider.OrganicBoxProvider
+from custom_components.organic_box.models import BasketItem, DeliveryInfo
+from custom_components.organic_box.provider import OrganicBoxProvider
 
 
 class MockProvider(OrganicBoxProvider):
