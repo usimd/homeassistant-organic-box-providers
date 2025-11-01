@@ -1,96 +1,76 @@
-"""Tests for organic_box models."""
+"""Tests for the Organic Box models."""
 
 import sys
-import types
+from pathlib import Path
+from datetime import datetime
 
-from custom_components.organic_box.models import Basket, Delivery, Item, Price
+# Add the component directory to the path
+component_path = Path(__file__).parent.parent / "custom_components" / "organic_box"
+sys.path.insert(0, str(component_path))
 
-# Setup Home Assistant mocks
-homeassistant_mod = types.ModuleType("homeassistant")
-homeassistant_core_mod = types.ModuleType("homeassistant.core")
-homeassistant_core_mod.HomeAssistant = type("HomeAssistant", (), {})
-homeassistant_helpers_mod = types.ModuleType("homeassistant.helpers")
-homeassistant_helpers_mod.service = None
-homeassistant_helpers_typing_mod = types.ModuleType("homeassistant.helpers.typing")
-homeassistant_helpers_typing_mod.ConfigType = dict
-event_mod = types.ModuleType("homeassistant.helpers.event")
+import models
+
+BasketItem = models.BasketItem
+DeliveryInfo = models.DeliveryInfo
 
 
-def async_track_time_interval(*args: object, **kwargs: object) -> None:
-    """Mock async_track_time_interval."""
-    pass
-
-
-event_mod.async_track_time_interval = async_track_time_interval
-sys.modules["homeassistant"] = homeassistant_mod
-sys.modules["homeassistant.core"] = homeassistant_core_mod
-sys.modules["homeassistant.helpers"] = homeassistant_helpers_mod
-sys.modules["homeassistant.helpers.event"] = event_mod
-sys.modules["homeassistant.helpers.typing"] = homeassistant_helpers_typing_mod
-
-
-# Constants for test values
-TEST_AMOUNT = 5.0
-TEST_CURRENCY = "EUR"
-TEST_ITEM_PRICE = 2.5
-TEST_BASKET_PRICE = 10.0
-TEST_DELIVERY_DATE = "2025-10-16"
-
-
-def test_price() -> None:
-    """Test Price model."""
-    p = Price(amount=TEST_AMOUNT)
-    assert p.amount == TEST_AMOUNT
-    assert p.currency == TEST_CURRENCY
-
-
-def test_item() -> None:
-    """Test Item model."""
-    price = Price(amount=TEST_ITEM_PRICE)
-    item = Item(
-        id="1",
-        name="Apple",
-        amount=1,
+def test_basket_item_creation():
+    """Test creating a basket item."""
+    item = BasketItem(
+        name="Apples",
+        quantity=5,
         unit="kg",
-        price=price,
-        category="Fruit",
+        product_id="123",
     )
-    assert item.name == "Apple"
-    assert item.price.amount == TEST_ITEM_PRICE
+
+    assert item.name == "Apples"
+    assert item.quantity == 5
+    assert item.unit == "kg"
+    assert item.product_id == "123"
 
 
-def test_basket() -> None:
-    """Test Basket model."""
-    price = Price(amount=TEST_BASKET_PRICE)
+def test_basket_item_without_optional_fields():
+    """Test creating a basket item without optional fields."""
+    item = BasketItem(
+        name="Bananas",
+        quantity=3,
+    )
+
+    assert item.name == "Bananas"
+    assert item.quantity == 3
+    assert item.unit is None
+    assert item.product_id is None
+
+
+def test_delivery_info_creation():
+    """Test creating delivery info."""
+    delivery_date = datetime(2025, 11, 15, 10, 0, 0)
     items = [
-        Item(
-            id="1",
-            name="Apple",
-            amount=1,
-            unit="kg",
-            price=price,
-            category="Fruit",
-        ),
+        BasketItem(name="Apples", quantity=5, unit="kg"),
+        BasketItem(name="Bananas", quantity=3, unit="kg"),
     ]
-    basket = Basket(items=items, total_price=price)
-    assert len(basket.items) == 1
-    assert basket.total_price.amount == TEST_BASKET_PRICE
+
+    delivery = DeliveryInfo(
+        delivery_date=delivery_date,
+        items=items,
+    )
+
+    assert delivery.delivery_date == delivery_date
+    assert len(delivery.items) == 2
+    assert delivery.total_items == 2
 
 
-def test_delivery() -> None:
-    """Test Delivery model."""
-    price = Price(amount=TEST_BASKET_PRICE)
+def test_delivery_info_auto_count():
+    """Test that total_items is automatically calculated."""
     items = [
-        Item(
-            id="1",
-            name="Apple",
-            amount=1,
-            unit="kg",
-            price=price,
-            category="Fruit",
-        ),
+        BasketItem(name="Item1", quantity=1),
+        BasketItem(name="Item2", quantity=1),
+        BasketItem(name="Item3", quantity=1),
     ]
-    basket = Basket(items=items, total_price=price)
-    delivery = Delivery(date=TEST_DELIVERY_DATE, basket=basket)
-    assert delivery.date == TEST_DELIVERY_DATE
-    assert delivery.basket.total_price.amount == TEST_BASKET_PRICE
+
+    delivery = DeliveryInfo(
+        delivery_date=None,
+        items=items,
+    )
+
+    assert delivery.total_items == 3

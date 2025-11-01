@@ -1,41 +1,28 @@
-"""Organic Box models for Home Assistant integration."""
+"""Data models for the Organic Box integration."""
 
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
-class Price:
-    """Represents a price with amount and currency."""
+class BasketItem:
+    """Representation of an item in the basket."""
 
-    amount: float
-    currency: str = "EUR"
-
-
-@dataclass
-class Item:
-    """Represents an item in a basket."""
-
-    id: str
     name: str
-    amount: float
-    unit: str
-    price: Price
-    category: str
-    image_url: str | None = None
+    quantity: float
+    unit: str | None = None
+    product_id: str | None = None
 
 
 @dataclass
-class Basket:
-    """Represents a basket containing items and total price."""
+class DeliveryInfo:
+    """Representation of delivery information."""
 
-    items: list[Item]
-    total_price: Price
+    delivery_date: datetime | None
+    items: list[BasketItem]
+    total_items: int = 0
 
-
-@dataclass
-class Delivery:
-    """Represents a delivery with date and basket."""
-
-    date: str
-    basket: Basket
-    address: str | None = None
+    def __post_init__(self):
+        """Calculate total items if not provided."""
+        if self.total_items == 0:
+            self.total_items = len(self.items)

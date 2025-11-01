@@ -1,4 +1,22 @@
-"""Constants for Organic Box Home Assistant integration."""
+"""Constants for the Organic Box integration."""
 
-DOMAIN = "organic_box"
-DOMAIN = "organic_box"
+from typing import Final
+
+DOMAIN: Final = "organic_box"
+
+# Configuration and options
+CONF_PROVIDER: Final = "provider"
+CONF_USERNAME: Final = "username"
+CONF_PASSWORD: Final = "password"
+CONF_SHOP_ID: Final = "shop_id"
+
+# Providers
+PROVIDER_OEKOBOX: Final = "oekobox"
+
+# Update intervals
+DEFAULT_SCAN_INTERVAL: Final = 3600  # 1 hour in seconds
+
+# Attributes
+ATTR_NEXT_DELIVERY: Final = "next_delivery"
+ATTR_BASKET_ITEMS: Final = "basket_items"
+ATTR_PROVIDER: Final = "provider"

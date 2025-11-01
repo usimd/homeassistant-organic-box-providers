@@ -1,4 +1,9 @@
-aiohttp
-pytest
-pytest-asyncio
-uv
+# Runtime dependencies
+pyoekoboxonline
+
+# Development dependencies (optional)
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# pytest-homeassistant-custom-component
+
+

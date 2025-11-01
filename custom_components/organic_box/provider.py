@@ -1,22 +1,58 @@
-"""Provider base class for Organic Box integration."""
+"""Abstract base class for organic box providers."""
 
-from typing import Any
+from abc import ABC, abstractmethod
 
-from .models import Delivery
+from .models import DeliveryInfo
 
 
-class OrganicBoxProvider:
+class OrganicBoxProvider(ABC):
     """Abstract base class for organic box providers."""
 
-    def __init__(self, config: dict[str, Any]) -> None:
-        """Initialize provider with config."""
-        self.config = config
+    def __init__(self, username: str, password: str) -> None:
+        """Initialize the provider.
 
-    async def async_get_next_delivery(self) -> Delivery:
-        """Return the next scheduled delivery."""
-        raise NotImplementedError
+        Args:
+            username: The username for authentication
+            password: The password for authentication
+        """
+        self._username = username
+        self._password = password
+        self._authenticated = False
+
+    @abstractmethod
+    async def authenticate(self) -> bool:
+        """Authenticate with the provider.
+
+        Returns:
+            True if authentication was successful, False otherwise
+        """
+
+    @abstractmethod
+    async def get_next_delivery(self) -> DeliveryInfo:
+        """Get information about the next delivery.
+
+        Returns:
+            DeliveryInfo object containing delivery date and items
+        """
+
+    @abstractmethod
+    async def test_connection(self) -> bool:
+        """Test the connection to the provider.
+
+        Returns:
+            True if connection test was successful, False otherwise
+        """
 
     @property
+    @abstractmethod
     def name(self) -> str:
-        """Provider name."""
-        raise NotImplementedError
+        """Return the name of the provider."""
+
+    @property
+    def is_authenticated(self) -> bool:
+        """Return whether the provider is authenticated."""
+        return self._authenticated
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close any open connections."""

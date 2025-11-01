@@ -1,9 +1,12 @@
 update_basket:
   name: Update Basket
-  description: Manually update the basket and delivery data from the provider.
-  fields: {}
+  description: Manually trigger an update of basket and delivery data
+  fields:
+    entity_id:
+      name: Entity
+      description: The Organic Box sensor entity to update
+      required: false
+      selector:
+        entity:
+          integration: organic_box
 
-align_shopping_list:
-  name: Align Shopping List
-  description: Remove items from Home Assistant's To Do list that are present in the planned basket.
-  fields: {}

@@ -2,11 +2,13 @@
   "domain": "organic_box",
   "name": "Organic Box",
   "codeowners": ["@usimd"],
+  "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/usimd/homeassistant-organic-box-providers",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "version": "0.1.0",
-  "requirements": [],
-  "config_flow": true
+  "issue_tracker": "https://github.com/usimd/homeassistant-organic-box-providers/issues",
+  "requirements": ["pyoekoboxonline"],
+  "version": "1.0.0"
 }
+

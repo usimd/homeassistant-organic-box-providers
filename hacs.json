@@ -1,4 +1,7 @@
 {
   "name": "Organic Box",
-  "homeassistant": "2023.0.0"
+  "render_readme": true,
+  "filename": "organic_box",
+  "homeassistant": "2024.1.0"
 }
+

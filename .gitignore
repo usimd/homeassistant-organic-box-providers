@@ -1,30 +1,37 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.env
-.venv
+*.py[cod]
+*$py.class
+*.so
+.Python
 env/
 venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
 
-# VS Code
+# IDEs
 .vscode/
-
-# Devcontainer
-.devcontainer/
-
-# Home Assistant
-home-assistant.log
-
-# Test & Coverage
-.coverage
-htmlcov/
-
-# HACS
-custom_components/organic_box/__pycache__/
-
-# Misc
-.DS_Store
+.idea/
 *.swp
 *.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+.mypy_cache/
+
+# Build
+dist/
+build/
+*.egg-info/
+

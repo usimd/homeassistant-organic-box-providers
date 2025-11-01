@@ -1,85 +1,78 @@
-"""Organic Box Home Assistant Integration."""
+"""The Organic Box integration."""
 
 import logging
-from datetime import timedelta
 
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.exceptions import ConfigEntryNotReady
 
-from .amperhof import AmperhofProvider
-from .const import DOMAIN
+from .const import CONF_PROVIDER, CONF_SHOP_ID, DOMAIN, PROVIDER_OEKOBOX
+from .coordinator import OrganicBoxDataUpdateCoordinator
+from .oekobox import OekoBoxProvider
+from .provider import OrganicBoxProvider
 
-SCAN_INTERVAL = timedelta(hours=1)
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS: list[Platform] = [Platform.SENSOR]
 
-async def async_setup(hass: HomeAssistant, _config: ConfigType = None) -> bool:
-    """Set up the Organic Box integration."""
+
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up Organic Box from a config entry."""
+    provider_type = entry.data[CONF_PROVIDER]
+    username = entry.data[CONF_USERNAME]
+    password = entry.data[CONF_PASSWORD]
+    shop_id = entry.data.get(CONF_SHOP_ID)
+
+    # Create the appropriate provider
+    provider: OrganicBoxProvider
+    if provider_type == PROVIDER_OEKOBOX:
+        provider = OekoBoxProvider(username, password, shop_id)
+    else:
+        _LOGGER.error("Unknown provider type: %s", provider_type)
+        return False
+
+    # Authenticate with the provider
+    try:
+        if not await provider.authenticate():
+            raise ConfigEntryNotReady("Failed to authenticate with provider")
+    except Exception as err:
+        _LOGGER.error("Error authenticating with provider: %s", err)
+        raise ConfigEntryNotReady from err
+
+    # Create the data update coordinator
+    coordinator = OrganicBoxDataUpdateCoordinator(hass, provider)
+
+    # Fetch initial data
+    await coordinator.async_config_entry_first_refresh()
+
+    # Store the coordinator
     hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = coordinator
 
-    async def update_basket_service(call: object) -> None:
-        """Service to update basket."""
-        del call
-        await async_update_basket(hass)
+    # Forward the setup to the sensor platform
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    async def align_shopping_list_service(call: object) -> None:
-        """Service to align shopping list."""
-        del call
-        await async_align_shopping_list(hass)
-
-        hass.services.async_register(
-            DOMAIN,
-            "update_basket",
-            update_basket_service,
-        )
-        hass.services.async_register(
-            DOMAIN,
-            "align_shopping_list",
-            align_shopping_list_service,
-        )
-
-    async_track_time_interval(
-        hass,
-        lambda _: hass.async_create_task(async_update_basket(hass)),
-        SCAN_INTERVAL,
-    )
     return True
 
 
-async def async_update_basket(hass: HomeAssistant) -> None:
-    """Update basket from provider and store deliveries."""
-    config = hass.data[DOMAIN].get("config", {})
-    provider = AmperhofProvider(config.get("amperhof", {}))
-    deliveries = await provider.async_get_upcoming_deliveries()
-    hass.data[DOMAIN]["deliveries"] = deliveries
-    _LOGGER.info(
-        f"Organic Box deliveries updated: {len(deliveries)} found.",
-    )
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    # Unload platforms
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        # Close the provider connection
+        coordinator: OrganicBoxDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+        await coordinator.provider.close()
+
+        # Remove the coordinator from hass.data
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
 
 
-async def async_align_shopping_list(hass: HomeAssistant) -> None:
-    """Align planned basket with Home Assistant's To Do list (shopping_list)."""
-    delivery = hass.data[DOMAIN].get("delivery")
-    if not delivery:
-        _LOGGER.warning("No delivery data available to align shopping list.")
-        return
-    basket_items = {item.name.lower() for item in delivery.basket.items}
-    # Get shopping_list entity (Home Assistant's To Do list)
-    todo_entity_id = "todo.shopping_list"
-    state_obj = hass.states.get(todo_entity_id)
-    if not state_obj:
-        _LOGGER.warning("Shopping list entity not found.")
-        return
-    todo_items = state_obj.attributes.get("items", [])
-    # Remove items from To Do list that are present in the basket
-    items_to_remove = [
-        item for item in todo_items if item.get("name", "").lower() in basket_items
-    ]
-    for item in items_to_remove:
-        await hass.services.async_call(
-            "todo",
-            "remove_item",
-            {"entity_id": todo_entity_id, "item": item["name"]},
-        )
-    _LOGGER.info(f"Removed {len(items_to_remove)} items from shopping list.")
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)

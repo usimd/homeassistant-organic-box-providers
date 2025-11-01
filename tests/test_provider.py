@@ -1,63 +1,88 @@
-"""Tests for organic_box provider and AmperhofProvider."""
+"""Tests for the abstract provider base class."""
 
-import asyncio
 import sys
-import types
-
+from pathlib import Path
 import pytest
 
-from custom_components.organic_box.amperhof import AmperhofProvider
-from custom_components.organic_box.provider import OrganicBoxProvider
+# Add the component directory to the path
+component_path = Path(__file__).parent.parent / "custom_components" / "organic_box"
+sys.path.insert(0, str(component_path))
 
-# Setup Home Assistant mocks
-homeassistant_mod = types.ModuleType("homeassistant")
-homeassistant_core_mod = types.ModuleType("homeassistant.core")
-homeassistant_core_mod.HomeAssistant = type("HomeAssistant", (), {})
-homeassistant_helpers_mod = types.ModuleType("homeassistant.helpers")
-homeassistant_helpers_mod.service = None
-homeassistant_helpers_typing_mod = types.ModuleType("homeassistant.helpers.typing")
-homeassistant_helpers_typing_mod.ConfigType = dict
-event_mod = types.ModuleType("homeassistant.helpers.event")
+import models
+import provider
+
+BasketItem = models.BasketItem
+DeliveryInfo = models.DeliveryInfo
+OrganicBoxProvider = provider.OrganicBoxProvider
 
 
-def async_track_time_interval(*args: object, **kwargs: object) -> None:
-    """Mock async_track_time_interval for Home Assistant tests."""
-    pass
+class MockProvider(OrganicBoxProvider):
+    """Mock provider for testing."""
+
+    @property
+    def name(self) -> str:
+        """Return the name of the provider."""
+        return "Mock Provider"
+
+    async def authenticate(self) -> bool:
+        """Mock authenticate method."""
+        self._authenticated = True
+        return True
+
+    async def get_next_delivery(self) -> DeliveryInfo:
+        """Mock get_next_delivery method."""
+        items = [BasketItem(name="Test Item", quantity=1)]
+        return DeliveryInfo(delivery_date=None, items=items)
+
+    async def test_connection(self) -> bool:
+        """Mock test_connection method."""
+        return True
+
+    async def close(self) -> None:
+        """Mock close method."""
+        self._authenticated = False
 
 
-event_mod.async_track_time_interval = async_track_time_interval
-sys.modules["homeassistant"] = homeassistant_mod
-sys.modules["homeassistant.core"] = homeassistant_core_mod
-sys.modules["homeassistant.helpers"] = homeassistant_helpers_mod
-sys.modules["homeassistant.helpers.event"] = event_mod
-sys.modules["homeassistant.helpers.typing"] = homeassistant_helpers_typing_mod
+def test_provider_initialization():
+    """Test provider initialization."""
+    provider = MockProvider("test_user", "test_pass")
+
+    assert provider._username == "test_user"
+    assert provider._password == "test_pass"
+    assert not provider.is_authenticated
 
 
-def test_provider_base_methods() -> None:
-    """Test DummyProvider name and delivery methods."""
+@pytest.mark.asyncio
+async def test_provider_authenticate():
+    """Test provider authentication."""
+    provider = MockProvider("test_user", "test_pass")
 
-    class DummyProvider(OrganicBoxProvider):
-        @property
-        def name(self) -> str:
-            """Provider name."""
-            return "Dummy"
+    result = await provider.authenticate()
 
-        async def async_get_next_delivery(self) -> None:
-            """Return None for test."""
-            return None
-
-    p = DummyProvider({})
-    assert p.name == "Dummy"
+    assert result is True
+    assert provider.is_authenticated
 
 
-def test_provider_base() -> None:
-    """Test NotImplementedError for base provider."""
-    provider = OrganicBoxProvider({})
-    with pytest.raises(NotImplementedError):
-        asyncio.run(provider.async_get_next_delivery())
+@pytest.mark.asyncio
+async def test_provider_get_next_delivery():
+    """Test getting next delivery."""
+    provider = MockProvider("test_user", "test_pass")
+
+    delivery = await provider.get_next_delivery()
+
+    assert delivery is not None
+    assert len(delivery.items) == 1
+    assert delivery.items[0].name == "Test Item"
 
 
-def test_amperhof_name() -> None:
-    """Test AmperhofProvider name property."""
-    provider = AmperhofProvider({"jwt_token": "dummy"})
-    assert provider.name == "Amperhof"
+@pytest.mark.asyncio
+async def test_provider_close():
+    """Test closing provider connection."""
+    provider = MockProvider("test_user", "test_pass")
+    await provider.authenticate()
+
+    assert provider.is_authenticated
+
+    await provider.close()
+
+    assert not provider.is_authenticated
