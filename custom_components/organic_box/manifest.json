@@ -8,7 +8,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/usimd/homeassistant-organic-box-providers/issues",
-  "requirements": ["pyoekoboxonline"],
+  "requirements": ["pyoekoboxonline==0.1.0b3"],
   "version": "1.0.0"
 }
 

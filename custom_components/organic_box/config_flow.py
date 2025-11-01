@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from pyoekoboxonline import OekoboxClient
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
@@ -80,9 +81,16 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # For OekoBox, we need to get shop selection
             if self._provider == PROVIDER_OEKOBOX:
                 try:
-                    provider = OekoBoxProvider(self._username, self._password)
-                    self._available_shops = await provider.get_available_shops()
-                    await provider.close()
+                    # Use static method to get shops without authentication
+                    shops = await OekoboxClient.get_shop_info()
+
+                    # Convert shops list to dict for dropdown
+                    self._available_shops = {}
+                    for shop in shops:
+                        # Shop objects have 'id' and 'name' attributes
+                        shop_id = str(shop.id)
+                        shop_name = shop.name
+                        self._available_shops[shop_id] = shop_name
 
                     if not self._available_shops:
                         errors["base"] = "no_shops_found"

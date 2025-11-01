@@ -1,7 +1,6 @@
 """OekoBox Online provider implementation."""
 
 import logging
-from datetime import datetime
 
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
 
@@ -40,13 +39,21 @@ class OekoBoxProvider(OrganicBoxProvider):
             True if authentication was successful, False otherwise
         """
         try:
-            self._client = OekoBoxOnline(self._username, self._password)
-            if self._shop_id:
-                await self._client.logon(self._shop_id)
-            else:
-                # If no shop_id provided, just initialize without logon
-                # This is for the shop selection step
-                pass
+            if not self._shop_id:
+                _LOGGER.error("Cannot authenticate without shop_id")
+                self._authenticated = False
+                return False
+
+            # Initialize client with shop_id, username, and password
+            self._client = OekoBoxOnline(
+                shop_id=self._shop_id,
+                username=self._username,
+                password=self._password
+            )
+
+            # Perform login (guest=False for user authentication)
+            await self._client.logon(guest=False)
+
             self._authenticated = True
             _LOGGER.info("Successfully authenticated with OekoBox Online")
             return True
@@ -83,28 +90,88 @@ class OekoBoxProvider(OrganicBoxProvider):
                 raise RuntimeError("Not authenticated with OekoBox Online")
 
         try:
-            # Get next delivery from the API
-            delivery_data = await self._client.get_next_delivery()
+            # Get delivery dates from the API
+            dates = await self._client.get_dates()
 
-            # Parse delivery date
+            # Find the next delivery date (DDate objects)
             delivery_date = None
-            if delivery_data.get("delivery_date"):
-                delivery_date = datetime.fromisoformat(delivery_data["delivery_date"])
+            next_ddate = None
 
-            # Parse basket items
+            # Filter for DDate objects and find the next upcoming one
+            from datetime import datetime as dt
+            from pyoekoboxonline import DDate
+
+            now = dt.now().date()
+            ddates = [d for d in dates if isinstance(d, DDate)]
+
+            for ddate in ddates:
+                if ddate.delivery_date:
+                    # Parse delivery_date string (format: YYYY-MM-DD)
+                    date_str = ddate.delivery_date
+                    date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
+
+                    if date_obj >= now:
+                        if delivery_date is None or date_obj < delivery_date:
+                            delivery_date = date_obj
+                            next_ddate = ddate
+
+            # Get orders to find items for the next delivery
             items = []
-            raw_items = delivery_data.get("items", [])
-            for item_data in raw_items:
-                item = BasketItem(
-                    name=item_data.get("name", "Unknown"),
-                    quantity=float(item_data.get("quantity", 0)),
-                    unit=item_data.get("unit"),
-                    product_id=item_data.get("id"),
-                )
-                items.append(item)
+            if next_ddate and next_ddate.delivery_date:
+                orders = await self._client.get_orders()
+
+                # Find orders matching the delivery date
+                from pyoekoboxonline import Order
+                for order in orders:
+                    if isinstance(order, Order) and order.ddate == next_ddate.delivery_date:
+                        # Get items for this order
+                        try:
+                            order_items = await self._client.get_order_items(order.id)
+
+                            # Convert order items to BasketItem objects
+                            for order_item in order_items:
+                                # order_item is likely an OrderItem or CartItem
+                                item_name = "Unknown"
+                                quantity = 0.0
+                                unit = None
+                                item_id = None
+
+                                # Try to get attributes (handles both dict and object)
+                                if hasattr(order_item, 'item_id'):
+                                    item_id = order_item.item_id
+                                if hasattr(order_item, 'amount'):
+                                    quantity = float(order_item.amount or 0)
+                                if hasattr(order_item, 'unit'):
+                                    unit = order_item.unit
+
+                                # Try to get the item details for the name
+                                if item_id:
+                                    try:
+                                        item_details = await self._client.get_item(item_id)
+                                        if hasattr(item_details, 'name'):
+                                            item_name = item_details.name
+                                        elif isinstance(item_details, dict):
+                                            item_name = item_details.get('name', 'Unknown')
+                                    except:
+                                        pass  # If we can't get item details, use default
+
+                                item = BasketItem(
+                                    name=item_name,
+                                    quantity=quantity,
+                                    unit=unit,
+                                    product_id=str(item_id) if item_id else None,
+                                )
+                                items.append(item)
+                        except Exception as item_err:
+                            _LOGGER.warning("Failed to get order items for order %s: %s", order.id, item_err)
+
+            # Convert date to datetime if found
+            delivery_datetime = None
+            if delivery_date:
+                delivery_datetime = dt.combine(delivery_date, dt.min.time())
 
             return DeliveryInfo(
-                delivery_date=delivery_date,
+                delivery_date=delivery_datetime,
                 items=items,
             )
         except Exception as err:
@@ -118,46 +185,3 @@ class OekoBoxProvider(OrganicBoxProvider):
             self._client = None
         self._authenticated = False
 
-    async def get_available_shops(self) -> dict[str, str]:
-        """Get available shops for the user.
-
-        Returns:
-            Dictionary mapping shop_id to shop name
-        """
-        if self._client is None:
-            self._client = OekoBoxOnline(self._username, self._password)
-
-        try:
-            shops_info = await self._client.get_shop_info()
-            # Expecting shops_info to be a list of Shop objects or dicts
-            # Format: {"shop_id": "Shop Name", ...}
-            shops = {}
-
-            if isinstance(shops_info, list):
-                for shop in shops_info:
-                    # Handle both dict and object attributes
-                    if hasattr(shop, "id") and hasattr(shop, "name"):
-                        # Shop object
-                        shop_id = str(shop.id)
-                        shop_name = shop.name
-                    elif isinstance(shop, dict):
-                        # Dict format
-                        shop_id = str(shop.get("id", shop.get("shop_id", "")))
-                        shop_name = shop.get(
-                            "name", shop.get("shop_name", f"Shop {shop_id}")
-                        )
-                    else:
-                        # Fallback
-                        shop_id = str(shop)
-                        shop_name = str(shop)
-
-                    if shop_id:
-                        shops[shop_id] = shop_name
-            elif isinstance(shops_info, dict):
-                shops = {str(k): str(v) for k, v in shops_info.items()}
-
-            _LOGGER.debug("Found %d shops for user %s", len(shops), self._username)
-            return shops
-        except Exception as err:
-            _LOGGER.error("Failed to get shop info: %s", err)
-            raise
