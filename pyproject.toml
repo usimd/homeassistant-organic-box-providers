@@ -1,7 +1,15 @@
 [project]
 name = ""
 version = "0.0.1"
-dependencies = ["pyoekoboxonline==0.1.0b3"]
+dependencies = ["pyoekoboxonline==0.1.0b5"]
+requires-python = ">=3.13.2"
+
+[dependency-groups]
+dev = [
+    "homeassistant>=2025.10.0",
+    "pytest>=8",
+    "pytest-homeassistant-custom-component>=0.13.260",
+]
 
 [tool.ruff]
 line-length = 88
@@ -17,11 +25,16 @@ line-ending = "lf"
 package = false
 
 [tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
 asyncio_mode = "auto"
-pythonpath = [".", "custom_components/organic_box"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+markers = [
+    "integration: Integration tests that require Home Assistant runtime",
+    "unit: Unit tests that don't require Home Assistant runtime",
+]
 
 [build-system]
 requires = ["setuptools", "wheel"]

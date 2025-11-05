@@ -1,20 +1,26 @@
 """Abstract base class for organic box providers."""
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from .models import DeliveryInfo
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 class OrganicBoxProvider(ABC):
     """Abstract base class for organic box providers."""
 
-    def __init__(self, username: str, password: str) -> None:
+    def __init__(self, hass: "HomeAssistant", username: str, password: str) -> None:
         """Initialize the provider.
 
         Args:
+            hass: Home Assistant instance
             username: The username for authentication
             password: The password for authentication
         """
+        self._hass = hass
         self._username = username
         self._password = password
         self._authenticated = False

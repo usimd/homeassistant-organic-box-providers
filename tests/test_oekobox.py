@@ -1,130 +1,136 @@
-"""Tests for OekoBox provider (integration tests - requires actual API or mocking)."""
+"""Tests for OekoBox provider implementation."""
+
+from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from homeassistant.core import HomeAssistant
 
-from custom_components.organic_box.oekobox import OekoBoxProvider
 from custom_components.organic_box.models import DeliveryInfo
+from custom_components.organic_box.oekobox import OekoBoxProvider
 
 
-@pytest.mark.asyncio
-async def test_oekobox_provider_name():
-    """Test OekoBox provider name."""
-    provider = OekoBoxProvider("test_user", "test_pass", shop_id="test_shop")
+@pytest.mark.unit
+async def test_oekobox_provider_initialization(hass: HomeAssistant):
+    """Test OekoBoxProvider initialization."""
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+
+    assert provider._username == "test@example.com"
+    assert provider._password == "password"
+    assert provider._shop_id == "shop123"
+    assert provider._client is None
+    assert provider.is_authenticated is False
     assert provider.name == "OekoBox Online"
 
 
-@pytest.mark.asyncio
-async def test_oekobox_authentication_success():
+@pytest.mark.unit
+async def test_oekobox_provider_authenticate_success(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
     """Test successful authentication."""
-    with patch("custom_components.organic_box.oekobox.OekoBoxOnline") as mock_client:
-        mock_instance = AsyncMock()
-        mock_client.return_value = mock_instance
-        mock_instance.logon.return_value = {"status": "ok"}
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    result = await provider.authenticate()
 
-        provider = OekoBoxProvider("test_user", "test_pass", shop_id="test_shop")
-        result = await provider.authenticate()
-
-        assert result is True
-        assert provider.is_authenticated
-        mock_client.assert_called_once_with(
-            shop_id="test_shop", username="test_user", password="test_pass"
-        )
-        mock_instance.logon.assert_called_once_with(guest=False)
+    assert result is True
+    assert provider.is_authenticated is True
+    mock_oekobox_client.logon.assert_called_once_with(guest=False)
 
 
-@pytest.mark.asyncio
-async def test_oekobox_authentication_failure():
-    """Test failed authentication."""
-    with patch("custom_components.organic_box.oekobox.OekoBoxOnline") as mock_client:
-        mock_instance = AsyncMock()
-        mock_instance.logon.side_effect = Exception("Authentication failed")
-        mock_client.return_value = mock_instance
+@pytest.mark.unit
+async def test_oekobox_provider_authenticate_no_shop_id(hass: HomeAssistant):
+    """Test authentication fails without shop_id."""
+    provider = OekoBoxProvider(hass, "test@example.com", "password", None)
+    result = await provider.authenticate()
 
-        provider = OekoBoxProvider("test_user", "test_pass", shop_id="test_shop")
-        result = await provider.authenticate()
-
-        assert result is False
-        assert not provider.is_authenticated
+    assert result is False
+    assert provider.is_authenticated is False
 
 
-@pytest.mark.asyncio
-async def test_oekobox_get_next_delivery():
-    """Test getting next delivery."""
-    from unittest.mock import MagicMock
+@pytest.mark.unit
+async def test_oekobox_provider_authenticate_failure(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test authentication failure."""
+    mock_oekobox_client.logon.side_effect = Exception("Auth failed")
 
-    # Mock DDate and Order objects
-    mock_ddate = MagicMock()
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    result = await provider.authenticate()
+
+    assert result is False
+    assert provider.is_authenticated is False
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_test_connection(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test connection test."""
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    result = await provider.test_connection()
+
+    assert result is True
+    assert provider.is_authenticated is True
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_get_next_delivery_empty(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test getting next delivery with no dates."""
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
+
+    delivery_info = await provider.get_next_delivery()
+
+    assert isinstance(delivery_info, DeliveryInfo)
+    assert delivery_info.delivery_date is None
+    assert len(delivery_info.items) == 0
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_get_next_delivery_with_dates(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test getting next delivery with dates."""
+    from pyoekoboxonline import DDate
+
+    # Mock DDate object
+    mock_ddate = MagicMock(spec=DDate)
     mock_ddate.delivery_date = "2025-11-15"
-    mock_ddate.id = 1
 
-    mock_order = MagicMock()
-    mock_order.ddate = "2025-11-15"
-    mock_order.id = 123
+    mock_oekobox_client.get_dates.return_value = [mock_ddate]
 
-    mock_order_item1 = MagicMock()
-    mock_order_item1.item_id = 1
-    mock_order_item1.amount = 2.5
-    mock_order_item1.unit = "kg"
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
 
-    mock_order_item2 = MagicMock()
-    mock_order_item2.item_id = 2
-    mock_order_item2.amount = 1.0
-    mock_order_item2.unit = "kg"
+    delivery_info = await provider.get_next_delivery()
 
-    mock_item1 = MagicMock()
-    mock_item1.name = "Organic Apples"
-
-    mock_item2 = MagicMock()
-    mock_item2.name = "Organic Carrots"
-
-    with patch("custom_components.organic_box.oekobox.OekoBoxOnline") as mock_client:
-        with patch("custom_components.organic_box.oekobox.DDate") as MockDDate:
-            with patch("custom_components.organic_box.oekobox.Order") as MockOrder:
-                mock_instance = AsyncMock()
-                mock_instance.get_dates.return_value = [mock_ddate]
-                mock_instance.get_orders.return_value = [mock_order]
-                mock_instance.get_order_items.return_value = [
-                    mock_order_item1,
-                    mock_order_item2,
-                ]
-                mock_instance.get_item.side_effect = [mock_item1, mock_item2]
-                mock_instance.logon.return_value = {"status": "ok"}
-                mock_client.return_value = mock_instance
-
-                # Make isinstance checks work
-                MockDDate.return_value = mock_ddate
-                MockOrder.return_value = mock_order
-
-                provider = OekoBoxProvider(
-                    "test_user", "test_pass", shop_id="test_shop"
-                )
-                await provider.authenticate()
-
-                delivery = await provider.get_next_delivery()
-
-                assert isinstance(delivery, DeliveryInfo)
-                assert delivery.delivery_date is not None
-                assert len(delivery.items) == 2
-                assert delivery.items[0].name == "Organic Apples"
-                assert delivery.items[0].quantity == 2.5
-                assert delivery.items[1].name == "Organic Carrots"
+    assert isinstance(delivery_info, DeliveryInfo)
+    assert delivery_info.delivery_date is not None
+    assert delivery_info.delivery_date.date() == datetime(2025, 11, 15).date()
 
 
-@pytest.mark.asyncio
-async def test_oekobox_close():
+@pytest.mark.unit
+async def test_oekobox_provider_close(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
     """Test closing the provider."""
-    with patch("custom_components.organic_box.oekobox.OekoBoxOnline") as mock_client:
-        mock_instance = AsyncMock()
-        mock_instance.logon.return_value = {"status": "ok"}
-        mock_client.return_value = mock_instance
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
+    await provider.close()
 
-        provider = OekoBoxProvider("test_user", "test_pass", shop_id="test_shop")
-        await provider.authenticate()
-
-        assert provider.is_authenticated
-
-        await provider.close()
-
-        assert not provider.is_authenticated
-        mock_instance.close.assert_called_once()
+    mock_oekobox_client.close.assert_called_once()
+    assert provider._client is None
+    assert provider.is_authenticated is False

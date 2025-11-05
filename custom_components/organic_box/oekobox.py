@@ -1,11 +1,16 @@
 """OekoBox Online provider implementation."""
 
 import logging
+from typing import TYPE_CHECKING
 
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
 
 from .models import BasketItem, DeliveryInfo
 from .provider import OrganicBoxProvider
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,16 +19,21 @@ class OekoBoxProvider(OrganicBoxProvider):
     """OekoBox Online provider implementation."""
 
     def __init__(
-        self, username: str, password: str, shop_id: str | None = None
+        self,
+        hass: "HomeAssistant",
+        username: str,
+        password: str,
+        shop_id: str | None = None,
     ) -> None:
         """Initialize the OekoBox provider.
 
         Args:
+            hass: Home Assistant instance
             username: The username for authentication
             password: The password for authentication
             shop_id: The shop ID to use for the provider
         """
-        super().__init__(username, password)
+        super().__init__(hass, username, password)
         self._client: OekoBoxOnline | None = None
         self._shop_id = shop_id
 
@@ -44,9 +54,15 @@ class OekoBoxProvider(OrganicBoxProvider):
                 self._authenticated = False
                 return False
 
-            # Initialize client with shop_id, username, and password
+            # Get the aiohttp client session from Home Assistant
+            session = async_get_clientsession(self._hass)
+
+            # Initialize client with shop_id, username, password, and session
             self._client = OekoBoxOnline(
-                shop_id=self._shop_id, username=self._username, password=self._password
+                shop_id=self._shop_id,
+                username=self._username,
+                password=self._password,
+                session=session,
             )
 
             # Perform login (guest=False for user authentication)

@@ -214,7 +214,7 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "Creating OekoBoxProvider with shop_id: %s", self._shop_id
                 )
                 provider = OekoBoxProvider(
-                    self._username, self._password, self._shop_id
+                    self.hass, self._username, self._password, self._shop_id
                 )
                 _LOGGER.debug("Testing connection...")
                 result = await provider.test_connection()

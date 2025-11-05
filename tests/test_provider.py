@@ -1,77 +1,107 @@
-"""Tests for the abstract provider base class."""
+"""Tests for organic_box provider."""
 
 import pytest
-from custom_components.organic_box.models import BasketItem, DeliveryInfo
+from homeassistant.core import HomeAssistant
+
+from custom_components.organic_box.models import DeliveryInfo
 from custom_components.organic_box.provider import OrganicBoxProvider
 
 
 class MockProvider(OrganicBoxProvider):
-    """Mock provider for testing."""
+    """Mock implementation of OrganicBoxProvider for testing."""
 
-    @property
-    def name(self) -> str:
-        """Return the name of the provider."""
-        return "Mock Provider"
+    def __init__(self, hass: HomeAssistant, username: str, password: str) -> None:
+        """Initialize mock provider."""
+        super().__init__(hass, username, password)
+        self.authenticate_called = False
+        self.get_next_delivery_called = False
+        self.test_connection_called = False
+        self.close_called = False
 
     async def authenticate(self) -> bool:
-        """Mock authenticate method."""
+        """Mock authenticate."""
+        self.authenticate_called = True
         self._authenticated = True
         return True
 
     async def get_next_delivery(self) -> DeliveryInfo:
-        """Mock get_next_delivery method."""
-        items = [BasketItem(name="Test Item", quantity=1)]
-        return DeliveryInfo(delivery_date=None, items=items)
+        """Mock get_next_delivery."""
+        self.get_next_delivery_called = True
+        return DeliveryInfo(delivery_date=None, items=[])
 
     async def test_connection(self) -> bool:
-        """Mock test_connection method."""
+        """Mock test_connection."""
+        self.test_connection_called = True
         return True
 
+    @property
+    def name(self) -> str:
+        """Return provider name."""
+        return "Mock Provider"
+
     async def close(self) -> None:
-        """Mock close method."""
-        self._authenticated = False
+        """Mock close."""
+        self.close_called = True
 
 
-def test_provider_initialization():
+@pytest.mark.unit
+async def test_provider_initialization(hass: HomeAssistant):
     """Test provider initialization."""
-    provider = MockProvider("test_user", "test_pass")
+    provider = MockProvider(hass, "test_user", "test_pass")
 
     assert provider._username == "test_user"
     assert provider._password == "test_pass"
-    assert not provider.is_authenticated
+    assert provider._authenticated is False
+    assert provider.is_authenticated is False
 
 
-@pytest.mark.asyncio
-async def test_provider_authenticate():
+@pytest.mark.unit
+async def test_provider_authenticate(hass: HomeAssistant):
     """Test provider authentication."""
-    provider = MockProvider("test_user", "test_pass")
+    provider = MockProvider(hass, "test_user", "test_pass")
 
     result = await provider.authenticate()
 
     assert result is True
-    assert provider.is_authenticated
+    assert provider.authenticate_called is True
+    assert provider.is_authenticated is True
 
 
-@pytest.mark.asyncio
-async def test_provider_get_next_delivery():
-    """Test getting next delivery."""
-    provider = MockProvider("test_user", "test_pass")
+@pytest.mark.unit
+async def test_provider_get_next_delivery(hass: HomeAssistant):
+    """Test provider get_next_delivery."""
+    provider = MockProvider(hass, "test_user", "test_pass")
 
-    delivery = await provider.get_next_delivery()
+    delivery_info = await provider.get_next_delivery()
 
-    assert delivery is not None
-    assert len(delivery.items) == 1
-    assert delivery.items[0].name == "Test Item"
+    assert provider.get_next_delivery_called is True
+    assert isinstance(delivery_info, DeliveryInfo)
 
 
-@pytest.mark.asyncio
-async def test_provider_close():
-    """Test closing provider connection."""
-    provider = MockProvider("test_user", "test_pass")
-    await provider.authenticate()
+@pytest.mark.unit
+async def test_provider_test_connection(hass: HomeAssistant):
+    """Test provider test_connection."""
+    provider = MockProvider(hass, "test_user", "test_pass")
 
-    assert provider.is_authenticated
+    result = await provider.test_connection()
+
+    assert result is True
+    assert provider.test_connection_called is True
+
+
+@pytest.mark.unit
+async def test_provider_name(hass: HomeAssistant):
+    """Test provider name property."""
+    provider = MockProvider(hass, "test_user", "test_pass")
+
+    assert provider.name == "Mock Provider"
+
+
+@pytest.mark.unit
+async def test_provider_close(hass: HomeAssistant):
+    """Test provider close."""
+    provider = MockProvider(hass, "test_user", "test_pass")
 
     await provider.close()
 
-    assert not provider.is_authenticated
+    assert provider.close_called is True
