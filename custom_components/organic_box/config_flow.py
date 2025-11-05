@@ -82,7 +82,9 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if self._provider == PROVIDER_OEKOBOX:
                 try:
                     # Use static method to get shops without authentication
+                    _LOGGER.debug("Fetching shop information...")
                     shops = await OekoboxClient.get_shop_info()
+                    _LOGGER.debug("Received %d shops", len(shops) if shops else 0)
 
                     # Convert shops list to dict for dropdown
                     self._available_shops = {}
@@ -91,14 +93,20 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         shop_id = str(shop.id)
                         shop_name = shop.name
                         self._available_shops[shop_id] = shop_name
+                        _LOGGER.debug("Added shop: %s - %s", shop_id, shop_name)
 
                     if not self._available_shops:
+                        _LOGGER.warning("No shops found in response")
                         errors["base"] = "no_shops_found"
                     else:
+                        _LOGGER.info(
+                            "Successfully fetched %d shops, proceeding to shop selection",
+                            len(self._available_shops),
+                        )
                         # Proceed to shop selection
                         return await self.async_step_shop_selection()
                 except Exception as err:
-                    _LOGGER.error("Error fetching shops: %s", err)
+                    _LOGGER.exception("Error fetching shops: %s", err)
                     errors["base"] = "cannot_connect"
             else:
                 # For other providers, test credentials directly
@@ -138,6 +146,11 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle the shop selection step for OekoBox."""
         errors = {}
+
+        _LOGGER.debug(
+            "Shop selection step called with user_input: %s", user_input is not None
+        )
+        _LOGGER.debug("Available shops: %s", self._available_shops)
 
         if user_input is not None:
             self._shop_id = user_input[CONF_SHOP_ID]
@@ -195,16 +208,22 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _test_credentials(self) -> bool:
         """Test if the credentials are valid."""
         try:
+            _LOGGER.debug("Testing credentials for provider: %s", self._provider)
             if self._provider == PROVIDER_OEKOBOX:
+                _LOGGER.debug(
+                    "Creating OekoBoxProvider with shop_id: %s", self._shop_id
+                )
                 provider = OekoBoxProvider(
                     self._username, self._password, self._shop_id
                 )
+                _LOGGER.debug("Testing connection...")
                 result = await provider.test_connection()
+                _LOGGER.debug("Test connection result: %s", result)
                 await provider.close()
                 return result
             else:
                 _LOGGER.error("Unknown provider: %s", self._provider)
                 return False
         except Exception as err:
-            _LOGGER.error("Error testing credentials: %s", err)
+            _LOGGER.exception("Error testing credentials: %s", err)
             return False
