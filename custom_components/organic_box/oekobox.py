@@ -227,9 +227,15 @@ class OekoBoxProvider(OrganicBoxProvider):
             if delivery_date:
                 delivery_datetime = dt.combine(delivery_date, dt.min.time())
 
+            # Extract last_order_change if available
+            last_order_change = None
+            if next_shop_date and hasattr(next_shop_date, "last_order_change"):
+                last_order_change = next_shop_date.last_order_change
+
             return DeliveryInfo(
                 delivery_date=delivery_datetime,
                 items=items,
+                last_order_change=last_order_change,
             )
         except Exception as err:
             _LOGGER.error("Failed to get next delivery: %s", err)

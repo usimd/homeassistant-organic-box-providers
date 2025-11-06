@@ -11,7 +11,12 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTR_BASKET_ITEMS, ATTR_PROVIDER, DOMAIN
+from .const import (
+    ATTR_BASKET_ITEMS,
+    ATTR_MATCHED_ITEMS,
+    ATTR_PROVIDER,
+    DOMAIN,
+)
 from .coordinator import OrganicBoxDataUpdateCoordinator
 from .models import DeliveryInfo
 
@@ -30,6 +35,7 @@ async def async_setup_entry(
         [
             OrganicBoxNextDeliverySensor(coordinator, entry),
             OrganicBoxBasketItemsSensor(coordinator, entry),
+            OrganicBoxLastOrderChangeSensor(coordinator, entry),
         ]
     )
 
@@ -139,9 +145,66 @@ class OrganicBoxBasketItemsSensor(OrganicBoxSensorBase):
             }
             if item.unit:
                 item_dict["unit"] = item.unit
+
+            # Add shopping list match info if available
+            if item.name in self.coordinator.matched_items:
+                match_data = self.coordinator.matched_items[item.name]
+                item_dict["matched_shopping_item"] = match_data[
+                    "shopping_list_item"
+                ].get("name")
+                item_dict["match_confidence"] = round(match_data["similarity"] * 100, 1)
+
             items_list.append(item_dict)
+
+        attributes = {
+            ATTR_PROVIDER: self.coordinator.provider.name,
+            ATTR_BASKET_ITEMS: items_list,
+        }
+
+        # Add summary of matched items
+        if self.coordinator.matched_items:
+            attributes[ATTR_MATCHED_ITEMS] = len(self.coordinator.matched_items)
+
+        return attributes
+
+
+class OrganicBoxLastOrderChangeSensor(OrganicBoxSensorBase):
+    """Sensor for the last time the order can be changed."""
+
+    _attr_translation_key = "last_order_change"
+
+    def __init__(
+        self,
+        coordinator: OrganicBoxDataUpdateCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the last order change sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_last_order_change"
+        self._attr_icon = "mdi:clock-alert-outline"
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the state of the sensor."""
+        if self.delivery_info and self.delivery_info.last_order_change:
+            return self.delivery_info.last_order_change
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        # Only available if there's a last_order_change time
+        return (
+            self.delivery_info is not None
+            and self.delivery_info.last_order_change is not None
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return the state attributes."""
+        if not self.delivery_info:
+            return {}
 
         return {
             ATTR_PROVIDER: self.coordinator.provider.name,
-            ATTR_BASKET_ITEMS: items_list,
         }

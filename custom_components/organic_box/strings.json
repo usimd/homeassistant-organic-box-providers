@@ -28,6 +28,22 @@
       "unknown_provider": "Unknown provider selected."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Shopping List Options",
+        "description": "Configure shopping list matching features",
+        "data": {
+          "enable_shopping_list_match": "Enable shopping list matching",
+          "match_threshold": "Match threshold (%)"
+        },
+        "data_description": {
+          "enable_shopping_list_match": "Automatically match items from your delivery with Home Assistant shopping list items",
+          "match_threshold": "Minimum similarity percentage required to consider items as matching (50-100%)"
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "next_delivery": {
@@ -35,6 +51,9 @@
       },
       "basket_items": {
         "name": "Basket items"
+      },
+      "last_order_change": {
+        "name": "Last order change time"
       }
     }
   },

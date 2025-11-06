@@ -41,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady from err
 
     # Create the data update coordinator
-    coordinator = OrganicBoxDataUpdateCoordinator(hass, provider)
+    coordinator = OrganicBoxDataUpdateCoordinator(hass, provider, entry)
 
     # Fetch initial data
     await coordinator.async_config_entry_first_refresh()
@@ -52,6 +52,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Forward the setup to the sensor platform
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Set up options flow listener
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     return True
 

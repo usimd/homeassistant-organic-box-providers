@@ -10,12 +10,23 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
 )
 
-from .const import CONF_PROVIDER, CONF_SHOP_ID, DOMAIN, PROVIDER_OEKOBOX
+from .const import (
+    CONF_ENABLE_SHOPPING_LIST_MATCH,
+    CONF_MATCH_THRESHOLD,
+    CONF_PROVIDER,
+    CONF_SHOP_ID,
+    DEFAULT_MATCH_THRESHOLD,
+    DOMAIN,
+    PROVIDER_OEKOBOX,
+)
 from .oekobox import OekoBoxProvider
 
 _LOGGER = logging.getLogger(__name__)
@@ -227,3 +238,52 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception as err:
             _LOGGER.exception("Error testing credentials: %s", err)
             return False
+
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> "OrganicBoxOptionsFlow":
+        """Get the options flow for this handler."""
+        return OrganicBoxOptionsFlow(config_entry)
+
+
+class OrganicBoxOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Organic Box integration."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_ENABLE_SHOPPING_LIST_MATCH,
+                        default=self.config_entry.options.get(
+                            CONF_ENABLE_SHOPPING_LIST_MATCH, False
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        CONF_MATCH_THRESHOLD,
+                        default=self.config_entry.options.get(
+                            CONF_MATCH_THRESHOLD, DEFAULT_MATCH_THRESHOLD
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=50,
+                            max=100,
+                            step=5,
+                            mode=NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                }
+            ),
+        )

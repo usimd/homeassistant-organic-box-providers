@@ -21,6 +21,7 @@ class DeliveryInfo:
     delivery_date: datetime | None
     items: list[BasketItem]
     total_items: int = 0
+    last_order_change: datetime | None = None  # Time until order can be changed
 
     def __post_init__(self):
         """Calculate total items if not provided."""
