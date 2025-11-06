@@ -2,36 +2,62 @@
   "config": {
     "step": {
       "user": {
-        "title": "Select Organic Box Provider",
-        "description": "Choose your organic box delivery provider.",
+        "title": "Select Provider",
+        "description": "Choose your organic box provider",
         "data": {
           "provider": "Provider"
         }
       },
       "credentials": {
-        "title": "Configure {provider}",
-        "description": "Enter your credentials for {provider}.",
+        "title": "Enter Credentials",
+        "description": "Enter your login credentials",
         "data": {
           "username": "Username",
-          "password": "Password"
-        }
-      },
-      "shop_selection": {
-        "title": "Select Shop",
-        "description": "Select the shop for {provider} (user: {username}).",
-        "data": {
-          "shop_id": "Shop"
+          "password": "Password",
+          "shop_id": "Shop ID"
         }
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect. Please check your credentials and try again.",
-      "no_shops_found": "No shops found for this account.",
+      "cannot_connect": "Failed to connect to the provider. Please check your credentials.",
+      "unknown_provider": "Unknown provider selected.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This account is already configured."
+      "already_configured": "This account is already configured.",
+      "unknown_provider": "Unknown provider selected."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_delivery": {
+        "name": "Next delivery"
+      },
+      "basket_items": {
+        "name": "Basket items"
+      }
+    }
+  },
+  "entity_component": {
+    "_": {
+      "name": "Organic Box",
+      "state": {
+        "next_delivery": {
+          "pending": "Pending",
+          "scheduled": "Scheduled"
+        }
+      },
+      "state_attributes": {
+        "provider": {
+          "name": "Provider"
+        },
+        "total_items": {
+          "name": "Total items"
+        },
+        "basket_items": {
+          "name": "Basket items"
+        }
+      }
     }
   }
 }
-

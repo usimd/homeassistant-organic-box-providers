@@ -39,6 +39,8 @@ class OrganicBoxSensorBase(
 ):
     """Base class for Organic Box sensors."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: OrganicBoxDataUpdateCoordinator,
@@ -56,7 +58,6 @@ class OrganicBoxSensorBase(
             identifiers={(DOMAIN, entry.entry_id)},
             name=f"Organic Box - {entry.data[CONF_USERNAME]}",
             manufacturer=coordinator.provider.name,
-            model="Organic Box Provider",
             entry_type=DeviceEntryType.SERVICE,
         )
 
@@ -69,6 +70,8 @@ class OrganicBoxSensorBase(
 class OrganicBoxNextDeliverySensor(OrganicBoxSensorBase):
     """Sensor for the next delivery date."""
 
+    _attr_translation_key = "next_delivery"
+
     def __init__(
         self,
         coordinator: OrganicBoxDataUpdateCoordinator,
@@ -76,7 +79,6 @@ class OrganicBoxNextDeliverySensor(OrganicBoxSensorBase):
     ) -> None:
         """Initialize the next delivery sensor."""
         super().__init__(coordinator, entry)
-        self._attr_name = "Organic Box Next Delivery"
         self._attr_unique_id = f"{entry.entry_id}_next_delivery"
         self._attr_icon = "mdi:truck-delivery"
 
@@ -102,6 +104,8 @@ class OrganicBoxNextDeliverySensor(OrganicBoxSensorBase):
 class OrganicBoxBasketItemsSensor(OrganicBoxSensorBase):
     """Sensor for the basket items count."""
 
+    _attr_translation_key = "basket_items"
+
     def __init__(
         self,
         coordinator: OrganicBoxDataUpdateCoordinator,
@@ -109,7 +113,6 @@ class OrganicBoxBasketItemsSensor(OrganicBoxSensorBase):
     ) -> None:
         """Initialize the basket items sensor."""
         super().__init__(coordinator, entry)
-        self._attr_name = "Organic Box Basket Items"
         self._attr_unique_id = f"{entry.entry_id}_basket_items"
         self._attr_icon = "mdi:basket"
         self._attr_state_class = SensorStateClass.MEASUREMENT
