@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
+from pyoekoboxonline.models import ShopDate, XUnit
 
 from .models import BasketItem, DeliveryInfo
 from .provider import OrganicBoxProvider
@@ -107,82 +108,119 @@ class OekoBoxProvider(OrganicBoxProvider):
             # Get delivery dates from the API
             dates = await self._client.get_dates()
 
-            # Find the next delivery date (DDate objects)
-            delivery_date = None
-            next_ddate = None
-
-            # Filter for DDate objects and find the next upcoming one
+            # Find the next delivery date from ShopDate objects
+            # Filter for ShopDate objects with order_state 0 (pending) or 1 (in preparation/delivery)
+            # Exclude order_state 2 (done/past) and -1 (cancelled)
             from datetime import datetime as dt
-            from pyoekoboxonline import DDate
+            from datetime import date as date_type
 
             now = dt.now().date()
-            ddates = [d for d in dates if isinstance(d, DDate)]
 
-            for ddate in ddates:
-                if ddate.delivery_date:
-                    # Parse delivery_date string (format: YYYY-MM-DD)
-                    date_str = ddate.delivery_date
-                    date_obj = dt.strptime(date_str, "%Y-%m-%d").date()
+            # Filter for ShopDate objects with order_state 0 (pending) or 1 (in preparation/delivery)
+            shop_dates = [d for d in dates if isinstance(d, ShopDate)]
+
+            # Filter for pending/in-progress orders (order_state 0 or 1)
+            # and dates that are today or in the future
+            # Also exclude dates with order_id == 0 (no delivery planned)
+            pending_dates = []
+            for shop_date in shop_dates:
+                if shop_date.order_state in (0, 1) and shop_date.order_id != 0:
+                    # delivery_date should be a datetime.date object
+                    if isinstance(shop_date.delivery_date, date_type):
+                        date_obj = shop_date.delivery_date
+                    elif isinstance(shop_date.delivery_date, dt):
+                        date_obj = shop_date.delivery_date.date()
+                    else:
+                        # Parse if it's a string
+                        date_obj = dt.strptime(
+                            str(shop_date.delivery_date), "%Y-%m-%d"
+                        ).date()
 
                     if date_obj >= now:
-                        if delivery_date is None or date_obj < delivery_date:
-                            delivery_date = date_obj
-                            next_ddate = ddate
+                        pending_dates.append((date_obj, shop_date))
+
+            # Sort by date and get the earliest one
+            pending_dates.sort(key=lambda x: x[0])
+
+            delivery_date = None
+            next_shop_date = None
+            if pending_dates:
+                delivery_date, next_shop_date = pending_dates[0]
 
             # Get orders to find items for the next delivery
             items = []
-            if next_ddate and next_ddate.delivery_date:
-                orders = await self._client.get_orders()
+            if (
+                next_shop_date
+                and next_shop_date.order_id
+                and next_shop_date.order_id > 0
+            ):
+                # Get items for this specific order
+                try:
+                    order_items = await self._client.get_order_items(
+                        next_shop_date.order_id
+                    )
 
-                # Find orders matching the delivery date
-                from pyoekoboxonline import Order
+                    # First, separate Items and XUnits, and build a lookup for XUnit overrides
+                    item_objects = []
+                    xunit_overrides = {}  # item_id -> XUnit
 
-                for order in orders:
-                    if (
-                        isinstance(order, Order)
-                        and order.ddate == next_ddate.delivery_date
-                    ):
-                        # Get items for this order
-                        try:
-                            order_items = await self._client.get_order_items(order.id)
+                    for order_item in order_items:
+                        if isinstance(order_item, XUnit):
+                            # XUnit overrides the unit/quantity for an item
+                            if hasattr(order_item, "item_id") and order_item.item_id:
+                                xunit_overrides[order_item.item_id] = order_item
+                        else:
+                            # Regular Item object
+                            item_objects.append(order_item)
 
-                            # Convert order items to BasketItem objects
-                            for order_item in order_items:
-                                # order_item is likely an OrderItem or CartItem
-                                item_name = "Unknown"
-                                quantity = 0.0
-                                unit = None
-                                item_id = None
+                    # Process Item objects and apply XUnit overrides if present
+                    for order_item in item_objects:
+                        item_name = "Unknown"
+                        quantity = 0.0
+                        unit = None
+                        item_id = None
 
-                                # Try to get attributes (handles both dict and object)
-                                if hasattr(order_item, "item_id"):
-                                    item_id = order_item.item_id
-                                if hasattr(order_item, "amount"):
-                                    quantity = float(order_item.amount or 0)
-                                if hasattr(order_item, "unit"):
-                                    unit = order_item.unit
+                        # Get item_id and basic info from the Item
+                        if hasattr(order_item, "item_id"):
+                            item_id = order_item.item_id
+                        if hasattr(order_item, "name"):
+                            item_name = order_item.name or "Unknown"
 
-                                # Try to get the item details for the name
-                                if item_id:
-                                    item_details = await self._client.get_item(item_id)
-                                    if hasattr(item_details, "name"):
-                                        item_name = item_details.name
-                                    elif isinstance(item_details, dict):
-                                        item_name = item_details.get("name", "Unknown")
+                        # Check if there's an XUnit override for this item
+                        if item_id and item_id in xunit_overrides:
+                            xunit = xunit_overrides[item_id]
+                            # XUnit overrides the unit and quantity
+                            if hasattr(xunit, "name"):
+                                unit = xunit.name  # XUnit.name is the unit name
+                            if hasattr(xunit, "parts"):
+                                # parts indicates the quantity/amount
+                                try:
+                                    quantity = float(xunit.parts or 1.0)
+                                except (ValueError, TypeError):
+                                    quantity = 1.0
+                        else:
+                            # No XUnit override, use Item's default values
+                            if hasattr(order_item, "unit"):
+                                unit = order_item.unit
+                            if hasattr(order_item, "amount_def"):
+                                quantity = float(order_item.amount_def or 1.0)
+                            elif hasattr(order_item, "amount"):
+                                quantity = float(order_item.amount or 1.0)
 
-                                item = BasketItem(
-                                    name=item_name,
-                                    quantity=quantity,
-                                    unit=unit,
-                                    product_id=str(item_id) if item_id else None,
-                                )
-                                items.append(item)
-                        except Exception as item_err:
-                            _LOGGER.warning(
-                                "Failed to get order items for order %s: %s",
-                                order.id,
-                                item_err,
-                            )
+                        # Create BasketItem
+                        item = BasketItem(
+                            name=item_name,
+                            quantity=quantity,
+                            unit=unit,
+                            product_id=str(item_id) if item_id else None,
+                        )
+                        items.append(item)
+                except Exception as item_err:
+                    _LOGGER.warning(
+                        "Failed to get order items for order %s: %s",
+                        next_shop_date.order_id,
+                        item_err,
+                    )
 
             # Convert date to datetime if found
             delivery_datetime = None
