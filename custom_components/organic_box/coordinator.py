@@ -40,17 +40,18 @@ class OrganicBoxDataUpdateCoordinator(DataUpdateCoordinator[DeliveryInfo]):
         self.provider = provider
         self.entry = entry
         self.matched_items: dict[str, dict] = {}
-
-        # Initialize shopping list matcher if enabled
         self.shopping_list_matcher: ShoppingListMatcher | None = None
-        self._update_shopping_list_matcher()
 
+        # Call parent init first to set up self.hass
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
+
+        # Now initialize shopping list matcher (after self.hass is available)
+        self._update_shopping_list_matcher()
 
     def _update_shopping_list_matcher(self) -> None:
         """Update shopping list matcher based on options."""
