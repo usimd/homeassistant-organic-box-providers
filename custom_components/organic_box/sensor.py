@@ -7,6 +7,7 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -51,12 +52,13 @@ class OrganicBoxSensorBase(
         """
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": f"Organic Box - {entry.data[CONF_USERNAME]}",
-            "manufacturer": coordinator.provider.name,
-            "model": "Organic Box Provider",
-        }
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"Organic Box - {entry.data[CONF_USERNAME]}",
+            manufacturer=coordinator.provider.name,
+            model="Organic Box Provider",
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
     @property
     def delivery_info(self) -> DeliveryInfo:

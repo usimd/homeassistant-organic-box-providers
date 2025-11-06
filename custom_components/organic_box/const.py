@@ -14,7 +14,7 @@ CONF_SHOP_ID: Final = "shop_id"
 PROVIDER_OEKOBOX: Final = "oekobox"
 
 # Update intervals
-DEFAULT_SCAN_INTERVAL: Final = 3600  # 1 hour in seconds
+DEFAULT_SCAN_INTERVAL: Final = 900  # 15 minutes in seconds
 
 # Attributes
 ATTR_NEXT_DELIVERY: Final = "next_delivery"
