@@ -118,13 +118,47 @@ class ShoppingListMatcher:
                 return []
 
             # The shopping list component stores items in the data
-            items = shopping_list_data.get("items", [])
+            # Handle both ShoppingData object (production) and dict (tests)
+            items = None
+            if isinstance(shopping_list_data, dict):
+                # Tests: dictionary with "items" key
+                items = shopping_list_data.get("items", [])
+            elif hasattr(shopping_list_data, "items"):
+                # Production: ShoppingData object with items attribute or method
+                items_attr = getattr(shopping_list_data, "items")
+                if callable(items_attr):
+                    items = items_attr()
+                else:
+                    items = items_attr
+            else:
+                _LOGGER.warning(
+                    "Unknown shopping list data type: %s", type(shopping_list_data)
+                )
+                return []
+
             if not items:
                 _LOGGER.debug("Shopping list is empty")
                 return []
 
             # Filter out completed items
-            active_items = [item for item in items if not item.get("complete", False)]
+            # Handle both dict items and object items
+            active_items = []
+            for item in items:
+                if isinstance(item, dict):
+                    if not item.get("complete", False):
+                        active_items.append(item)
+                else:
+                    # Assume it's an object with attributes
+                    if not getattr(item, "complete", False):
+                        # Convert object to dict for consistent handling
+                        active_items.append(
+                            {
+                                "id": getattr(item, "id", None),
+                                "name": getattr(item, "name", ""),
+                                "complete": getattr(item, "complete", False),
+                            }
+                        )
+
             _LOGGER.debug("Found %d active shopping list items", len(active_items))
             return active_items
 
