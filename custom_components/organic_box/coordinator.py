@@ -48,6 +48,7 @@ class OrganicBoxDataUpdateCoordinator(DataUpdateCoordinator[DeliveryInfo]):
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+            config_entry=entry,
         )
 
         # Now initialize shopping list matcher (after self.hass is available)

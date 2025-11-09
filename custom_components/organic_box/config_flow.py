@@ -242,17 +242,13 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> "OrganicBoxOptionsFlow":
+    ) -> config_entries.OptionsFlow:
         """Get the options flow for this handler."""
-        return OrganicBoxOptionsFlow(config_entry)
+        return OrganicBoxOptionsFlow()
 
 
 class OrganicBoxOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Organic Box integration."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
