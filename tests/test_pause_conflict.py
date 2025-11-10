@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -20,6 +20,14 @@ from custom_components.organic_box.const import (
     PROVIDER_OEKOBOX,
 )
 from custom_components.organic_box.oekobox import OekoBoxProvider
+
+
+def get_week_range(delivery_date):
+    """Helper to calculate the week range (Monday to Sunday) for a given date."""
+    days_to_monday = delivery_date.weekday()
+    week_start = delivery_date - timedelta(days=days_to_monday)
+    week_end = week_start + timedelta(days=6)
+    return week_start, week_end
 
 
 @pytest.fixture
@@ -78,13 +86,19 @@ async def test_pause_conflict_with_auto_cancel_enabled(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date
+    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
+    delivery_date = datetime(2025, 11, 15).date()
     shop_date = ShopDate(
-        delivery_date=datetime(2025, 11, 15).date(),
+        delivery_date=delivery_date,
         order_id=123,
         order_state=0,
     )
     mock_client.get_dates.return_value = [shop_date]
+
+    # Calculate expected week range (Monday to Sunday)
+    week_start, week_end = get_week_range(delivery_date)
+    expected_from = datetime.combine(week_start, datetime.min.time())
+    expected_to = datetime.combine(week_end, datetime.max.time())
 
     # First call to add_pause raises HTTP 409 Conflict
     conflict_error = OekoboxAPIError("Conflict", status_code=409)
@@ -101,12 +115,16 @@ async def test_pause_conflict_with_auto_cancel_enabled(
     # Verify add_pause was called twice
     assert mock_client.add_pause.call_count == 2
 
-    # First call should be with auto_cancel=False
+    # First call should be with auto_cancel=False and full week range
     first_call = mock_client.add_pause.call_args_list[0]
+    assert first_call.args[0] == expected_from
+    assert first_call.args[1] == expected_to
     assert first_call.kwargs.get("auto_cancel") is False
 
-    # Second call should be with auto_cancel=True
+    # Second call should be with auto_cancel=True and same week range
     second_call = mock_client.add_pause.call_args_list[1]
+    assert second_call.args[0] == expected_from
+    assert second_call.args[1] == expected_to
     assert second_call.kwargs.get("auto_cancel") is True
 
 
@@ -130,13 +148,19 @@ async def test_pause_conflict_without_auto_cancel(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date
+    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
+    delivery_date = datetime(2025, 11, 15).date()
     shop_date = ShopDate(
-        delivery_date=datetime(2025, 11, 15).date(),
+        delivery_date=delivery_date,
         order_id=123,
         order_state=0,
     )
     mock_client.get_dates.return_value = [shop_date]
+
+    # Calculate expected week range (Monday to Sunday)
+    week_start, week_end = get_week_range(delivery_date)
+    expected_from = datetime.combine(week_start, datetime.min.time())
+    expected_to = datetime.combine(week_end, datetime.max.time())
 
     # add_pause raises HTTP 409 Conflict
     conflict_error = OekoboxAPIError("Conflict", status_code=409)
@@ -151,8 +175,10 @@ async def test_pause_conflict_without_auto_cancel(
     # Verify add_pause was only called once
     assert mock_client.add_pause.call_count == 1
 
-    # Call should be with auto_cancel=False
+    # Call should be with auto_cancel=False and full week range
     call_args = mock_client.add_pause.call_args
+    assert call_args.args[0] == expected_from
+    assert call_args.args[1] == expected_to
     assert call_args.kwargs.get("auto_cancel") is False
 
 
@@ -176,13 +202,19 @@ async def test_pause_success_without_conflict(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date
+    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
+    delivery_date = datetime(2025, 11, 15).date()
     shop_date = ShopDate(
-        delivery_date=datetime(2025, 11, 15).date(),
+        delivery_date=delivery_date,
         order_id=123,
         order_state=0,
     )
     mock_client.get_dates.return_value = [shop_date]
+
+    # Calculate expected week range (Monday to Sunday)
+    week_start, week_end = get_week_range(delivery_date)
+    expected_from = datetime.combine(week_start, datetime.min.time())
+    expected_to = datetime.combine(week_end, datetime.max.time())
 
     # add_pause succeeds on first try
     mock_client.add_pause = AsyncMock(return_value=None)
@@ -196,8 +228,10 @@ async def test_pause_success_without_conflict(
     # Verify add_pause was only called once
     assert mock_client.add_pause.call_count == 1
 
-    # Call should be with auto_cancel=False
+    # Call should be with auto_cancel=False and full week range
     call_args = mock_client.add_pause.call_args
+    assert call_args.args[0] == expected_from
+    assert call_args.args[1] == expected_to
     assert call_args.kwargs.get("auto_cancel") is False
 
 

@@ -3,6 +3,7 @@
 import logging
 from datetime import date as date_type
 from datetime import datetime as dt
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
@@ -387,23 +388,39 @@ class OekoBoxProvider(OrganicBoxProvider):
             )
 
             # Use add_pause method with the delivery date
-            # add_pause expects (from_date, to_date) as datetime - pause only this specific date
+            # The pause needs to span the entire week (Monday to Sunday) for it to show up in the shop UI
             if hasattr(self._client, "add_pause"):
-                # Convert date to datetime
-                from_datetime = dt.combine(delivery_date, dt.min.time())
-                to_datetime = dt.combine(delivery_date, dt.max.time())
+                # Calculate the start (Monday) and end (Sunday) of the week containing the delivery date
+                # weekday() returns 0 for Monday, 6 for Sunday
+                days_to_monday = delivery_date.weekday()  # 0 if Monday, 6 if Sunday
+                week_start = delivery_date - timedelta(days=days_to_monday)
+                week_end = week_start + timedelta(days=6)  # Sunday
+
+                # Convert to datetime objects
+                from_datetime = dt.combine(week_start, dt.min.time())
+                to_datetime = dt.combine(week_end, dt.max.time())
+
+                _LOGGER.debug(
+                    "Pausing full week: %s to %s (delivery on %s)",
+                    week_start,
+                    week_end,
+                    delivery_date,
+                )
 
                 try:
                     # First attempt without auto_cancel
                     _LOGGER.debug(
-                        "Calling add_pause for date %s (auto_cancel=False)",
-                        delivery_date,
+                        "Calling add_pause from %s to %s (auto_cancel=False)",
+                        week_start,
+                        week_end,
                     )
                     await self._client.add_pause(
                         from_datetime, to_datetime, auto_cancel=False
                     )
                     _LOGGER.info(
-                        "Successfully paused delivery on %s (order_id %s)",
+                        "Successfully paused delivery week %s to %s (delivery on %s, order_id %s)",
+                        week_start,
+                        week_end,
                         delivery_date,
                         next_shop_date.order_id,
                     )
@@ -413,22 +430,27 @@ class OekoBoxProvider(OrganicBoxProvider):
                     # Check if it's a HTTP 409 Conflict error
                     if hasattr(api_err, "status_code") and api_err.status_code == 409:
                         _LOGGER.debug(
-                            "Received HTTP 409 Conflict when trying to pause delivery on %s: %s",
-                            delivery_date,
+                            "Received HTTP 409 Conflict when trying to pause delivery week %s to %s: %s",
+                            week_start,
+                            week_end,
                             api_err,
                         )
 
                         # Retry with auto_cancel if the option is enabled
                         if self._auto_cancel_on_pause_conflict:
                             _LOGGER.info(
-                                "Auto-cancel on pause conflict is enabled, retrying with auto_cancel=True"
+                                "Auto-cancel on pause conflict is enabled, retrying with auto_cancel=True for week %s to %s",
+                                week_start,
+                                week_end,
                             )
                             try:
                                 await self._client.add_pause(
                                     from_datetime, to_datetime, auto_cancel=True
                                 )
                                 _LOGGER.info(
-                                    "Successfully paused delivery on %s with auto_cancel=True (order_id %s)",
+                                    "Successfully paused delivery week %s to %s with auto_cancel=True (delivery on %s, order_id %s)",
+                                    week_start,
+                                    week_end,
                                     delivery_date,
                                     next_shop_date.order_id,
                                 )
@@ -441,10 +463,11 @@ class OekoBoxProvider(OrganicBoxProvider):
                                 return False
                         else:
                             _LOGGER.warning(
-                                "HTTP 409 Conflict: A basket is already planned for %s. "
+                                "HTTP 409 Conflict: A basket is already planned for the week %s to %s. "
                                 "Enable 'Auto-cancel on pause conflict' option to automatically "
                                 "cancel the order when pausing.",
-                                delivery_date,
+                                week_start,
+                                week_end,
                             )
                             return False
                     else:
