@@ -11,6 +11,7 @@ CONF_PASSWORD: Final = "password"
 CONF_SHOP_ID: Final = "shop_id"
 CONF_ENABLE_SHOPPING_LIST_MATCH: Final = "enable_shopping_list_match"
 CONF_MATCH_THRESHOLD: Final = "match_threshold"
+CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT: Final = "auto_cancel_on_pause_conflict"
 
 # Providers
 PROVIDER_OEKOBOX: Final = "oekobox"

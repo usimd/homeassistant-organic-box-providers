@@ -19,6 +19,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT,
     CONF_ENABLE_SHOPPING_LIST_MATCH,
     CONF_MATCH_THRESHOLD,
     CONF_PROVIDER,
@@ -224,8 +225,9 @@ class OrganicBoxConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug(
                     "Creating OekoBoxProvider with shop_id: %s", self._shop_id
                 )
+                # Pass None for config_entry during testing (options won't be available)
                 provider = OekoBoxProvider(
-                    self.hass, self._username, self._password, self._shop_id
+                    self.hass, self._username, self._password, self._shop_id, None
                 )
                 _LOGGER.debug("Testing connection...")
                 result = await provider.test_connection()
@@ -280,6 +282,12 @@ class OrganicBoxOptionsFlow(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.SLIDER,
                         )
                     ),
+                    vol.Optional(
+                        CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT,
+                        default=self.config_entry.options.get(
+                            CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT, False
+                        ),
+                    ): bool,
                 }
             ),
         )

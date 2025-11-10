@@ -35,11 +35,13 @@
         "description": "Configure shopping list matching features",
         "data": {
           "enable_shopping_list_match": "Enable shopping list matching",
-          "match_threshold": "Match threshold (%)"
+          "match_threshold": "Match threshold (%)",
+          "auto_cancel_on_pause_conflict": "Auto-cancel on pause conflict"
         },
         "data_description": {
           "enable_shopping_list_match": "Automatically match items from your delivery with Home Assistant shopping list items",
-          "match_threshold": "Minimum similarity percentage required to consider items as matching (50-100%)"
+          "match_threshold": "Minimum similarity percentage required to consider items as matching (50-100%)",
+          "auto_cancel_on_pause_conflict": "Automatically cancel existing basket when pausing a delivery results in a conflict (HTTP 409)"
         }
       }
     }

@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create the appropriate provider
     provider: OrganicBoxProvider
     if provider_type == PROVIDER_OEKOBOX:
-        provider = OekoBoxProvider(hass, username, password, shop_id)
+        provider = OekoBoxProvider(hass, username, password, shop_id, entry)
     else:
         _LOGGER.error("Unknown provider type: %s", provider_type)
         return False

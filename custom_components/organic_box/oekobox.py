@@ -5,10 +5,13 @@ from datetime import date as date_type
 from datetime import datetime as dt
 from typing import TYPE_CHECKING
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
+from pyoekoboxonline.exceptions import OekoboxAPIError
 from pyoekoboxonline.models import Pause, ShopDate, XUnit
 
+from .const import CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT
 from .models import BasketItem, DeliveryInfo
 from .provider import OrganicBoxProvider
 
@@ -27,6 +30,7 @@ class OekoBoxProvider(OrganicBoxProvider):
         username: str,
         password: str,
         shop_id: str | None = None,
+        config_entry: ConfigEntry | None = None,
     ) -> None:
         """Initialize the OekoBox provider.
 
@@ -35,10 +39,23 @@ class OekoBoxProvider(OrganicBoxProvider):
             username: The username for authentication
             password: The password for authentication
             shop_id: The shop ID to use for the provider
+            config_entry: The config entry for accessing options
         """
         super().__init__(hass, username, password)
         self._client: OekoBoxOnline | None = None
         self._shop_id = shop_id
+        self._config_entry = config_entry
+        self._auto_cancel_on_pause_conflict = False
+
+        # Load auto_cancel option from config_entry
+        if config_entry:
+            self._auto_cancel_on_pause_conflict = config_entry.options.get(
+                CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT, False
+            )
+            _LOGGER.debug(
+                "Auto-cancel on pause conflict: %s",
+                self._auto_cancel_on_pause_conflict,
+            )
 
     @property
     def name(self) -> str:
@@ -363,19 +380,77 @@ class OekoBoxProvider(OrganicBoxProvider):
                 _LOGGER.warning("No pending delivery found to pause")
                 return False
 
+            _LOGGER.debug(
+                "Attempting to pause delivery on %s (order_id %s)",
+                delivery_date,
+                next_shop_date.order_id,
+            )
+
             # Use add_pause method with the delivery date
             # add_pause expects (from_date, to_date) as datetime - pause only this specific date
             if hasattr(self._client, "add_pause"):
                 # Convert date to datetime
                 from_datetime = dt.combine(delivery_date, dt.min.time())
                 to_datetime = dt.combine(delivery_date, dt.max.time())
-                await self._client.add_pause(from_datetime, to_datetime)
-                _LOGGER.info(
-                    "Paused delivery on %s (order_id %s)",
-                    delivery_date,
-                    next_shop_date.order_id,
-                )
-                return True
+
+                try:
+                    # First attempt without auto_cancel
+                    _LOGGER.debug(
+                        "Calling add_pause for date %s (auto_cancel=False)",
+                        delivery_date,
+                    )
+                    await self._client.add_pause(
+                        from_datetime, to_datetime, auto_cancel=False
+                    )
+                    _LOGGER.info(
+                        "Successfully paused delivery on %s (order_id %s)",
+                        delivery_date,
+                        next_shop_date.order_id,
+                    )
+                    return True
+
+                except OekoboxAPIError as api_err:
+                    # Check if it's a HTTP 409 Conflict error
+                    if hasattr(api_err, "status_code") and api_err.status_code == 409:
+                        _LOGGER.debug(
+                            "Received HTTP 409 Conflict when trying to pause delivery on %s: %s",
+                            delivery_date,
+                            api_err,
+                        )
+
+                        # Retry with auto_cancel if the option is enabled
+                        if self._auto_cancel_on_pause_conflict:
+                            _LOGGER.info(
+                                "Auto-cancel on pause conflict is enabled, retrying with auto_cancel=True"
+                            )
+                            try:
+                                await self._client.add_pause(
+                                    from_datetime, to_datetime, auto_cancel=True
+                                )
+                                _LOGGER.info(
+                                    "Successfully paused delivery on %s with auto_cancel=True (order_id %s)",
+                                    delivery_date,
+                                    next_shop_date.order_id,
+                                )
+                                return True
+                            except Exception as retry_err:
+                                _LOGGER.error(
+                                    "Failed to pause delivery with auto_cancel=True: %s",
+                                    retry_err,
+                                )
+                                return False
+                        else:
+                            _LOGGER.warning(
+                                "HTTP 409 Conflict: A basket is already planned for %s. "
+                                "Enable 'Auto-cancel on pause conflict' option to automatically "
+                                "cancel the order when pausing.",
+                                delivery_date,
+                            )
+                            return False
+                    else:
+                        # Re-raise if it's not a 409 error
+                        raise
+
             else:
                 _LOGGER.warning(
                     "add_pause method not available in pyoekoboxonline library"
