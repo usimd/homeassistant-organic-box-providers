@@ -62,3 +62,39 @@ class OrganicBoxProvider(ABC):
     @abstractmethod
     async def close(self) -> None:
         """Close any open connections."""
+
+    async def pause_next_delivery(self) -> bool:
+        """Pause the next delivery.
+
+        Returns:
+            True if successful, False otherwise
+
+        Note:
+            Default implementation returns False (not supported).
+            Override this method in provider implementations that support pausing.
+        """
+        return False
+
+    async def unpause_next_delivery(self) -> bool:
+        """Unpause (resume) the next delivery.
+
+        Returns:
+            True if successful, False otherwise
+
+        Note:
+            Default implementation returns False (not supported).
+            Override this method in provider implementations that support pausing.
+        """
+        return False
+
+    def supports_pause(self) -> bool:
+        """Return whether the provider supports pausing deliveries.
+
+        Returns:
+            True if the provider supports pausing, False otherwise
+
+        Note:
+            Default implementation returns False.
+            Override this method in provider implementations that support pausing.
+        """
+        return False

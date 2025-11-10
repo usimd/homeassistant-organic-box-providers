@@ -55,6 +55,11 @@
       "last_order_change": {
         "name": "Last order change time"
       }
+    },
+    "switch": {
+      "delivery_pause": {
+        "name": "Pause next delivery"
+      }
     }
   },
   "entity_component": {

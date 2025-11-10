@@ -22,6 +22,8 @@ class DeliveryInfo:
     items: list[BasketItem]
     total_items: int = 0
     last_order_change: datetime | None = None  # Time until order can be changed
+    is_paused: bool = False  # Whether the next delivery is paused
+    can_pause: bool = False  # Whether the provider supports pausing
 
     def __post_init__(self):
         """Calculate total items if not provided."""

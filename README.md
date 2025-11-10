@@ -14,11 +14,19 @@ This custom integration enables Home Assistant to query various organic food box
 - Exposes sensor entities for:
   - Next delivery date
   - Basket items count (with detailed items list in attributes)
+  - Last order change time (deadline for modifying orders)
+- **Delivery pause control** (when supported by provider):
+  - Binary switch to pause/unpause next delivery
+  - State synchronization with provider backend
+  - Automatic detection of pause support
 - Dynamic configuration UI (config flow)
   - Select provider from dropdown
   - Configure provider-specific credentials
 - Data update coordinator for efficient polling
 - Service to manually update basket/delivery
+- Shopping list matching (optional):
+  - Automatically match delivery items with Home Assistant shopping list
+  - Configurable similarity threshold
 
 ## Installation via HACS
 
@@ -120,9 +128,11 @@ To add support for a new organic box provider:
 ## Services
 - `organic_box.update_basket`: Manually trigger an update of basket/delivery data.
 
-## Sensors
+## Entities
 
-The integration provides two sensors per configured account:
+The integration provides the following entities per configured account:
+
+### Sensors
 
 1. **Next Delivery Sensor** (`sensor.organic_box_next_delivery`)
    - State: The next delivery date and time
@@ -131,6 +141,35 @@ The integration provides two sensors per configured account:
 2. **Basket Items Sensor** (`sensor.organic_box_basket_items`)
    - State: Number of items in the basket
    - Attributes: Provider name, detailed list of items with names, quantities, and units
+
+3. **Last Order Change Sensor** (`sensor.organic_box_last_order_change`)
+   - State: Deadline for modifying the order
+   - Only available when provider supports order modification deadlines
+
+### Switch
+
+1. **Delivery Pause Switch** (`switch.organic_box_pause_next_delivery`)
+   - State: ON when delivery is paused, OFF when active
+   - Actions: Toggle to pause/unpause the next delivery
+   - Only created when provider supports delivery pausing
+   - Automatically syncs with backend pause status
+   
+**Usage in Automations**:
+```yaml
+# Pause delivery when going on vacation
+automation:
+  - alias: "Pause delivery for vacation"
+    trigger:
+      - platform: calendar
+        event: start
+        entity_id: calendar.vacation
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.organic_box_pause_next_delivery
+```
+
+See [DELIVERY_PAUSE_FEATURE.md](DELIVERY_PAUSE_FEATURE.md) for detailed documentation.
 
 ## Architecture
 

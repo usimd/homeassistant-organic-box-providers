@@ -57,3 +57,19 @@ def mock_oekobox_online_fixture(mock_oekobox_client):
         return_value=mock_oekobox_client,
     ) as mock:
         yield mock
+
+
+@pytest.fixture(name="mock_coordinator")
+def mock_coordinator_fixture():
+    """Return a mocked OrganicBoxDataUpdateCoordinator."""
+    mock_coordinator = MagicMock()
+    mock_coordinator.data = None
+    mock_coordinator.last_update_success = True
+    mock_coordinator.provider = MagicMock()
+    mock_coordinator.provider.name = "Test Provider"
+    mock_coordinator.provider.supports_pause = MagicMock(return_value=False)
+    mock_coordinator.provider.pause_next_delivery = AsyncMock(return_value=False)
+    mock_coordinator.provider.unpause_next_delivery = AsyncMock(return_value=False)
+    mock_coordinator.async_request_refresh = AsyncMock()
+    mock_coordinator.async_set_updated_data = MagicMock()
+    return mock_coordinator

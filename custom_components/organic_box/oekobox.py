@@ -1,11 +1,13 @@
 """OekoBox Online provider implementation."""
 
 import logging
+from datetime import date as date_type
+from datetime import datetime as dt
 from typing import TYPE_CHECKING
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
-from pyoekoboxonline.models import ShopDate, XUnit
+from pyoekoboxonline.models import Pause, ShopDate, XUnit
 
 from .models import BasketItem, DeliveryInfo
 from .provider import OrganicBoxProvider
@@ -42,6 +44,133 @@ class OekoBoxProvider(OrganicBoxProvider):
     def name(self) -> str:
         """Return the name of the provider."""
         return "OekoBox Online"
+
+    def supports_pause(self) -> bool:
+        """Return whether the provider supports pausing deliveries."""
+        # OekoBox Online supports pausing deliveries
+        return True
+
+    @staticmethod
+    def _parse_date(date_value: date_type | dt | str) -> date_type:
+        """Parse a date value to a date object.
+
+        Args:
+            date_value: Date value to parse (can be date, datetime, or string)
+
+        Returns:
+            date object
+        """
+        if isinstance(date_value, date_type) and not isinstance(date_value, dt):
+            return date_value
+        if isinstance(date_value, dt):
+            return date_value.date()
+        # Parse string
+        return dt.strptime(str(date_value), "%Y-%m-%d").date()
+
+    async def _get_shop_dates(self) -> list[ShopDate]:
+        """Get all shop dates from the API.
+
+        Returns:
+            List of ShopDate objects
+
+        Raises:
+            RuntimeError: If not authenticated
+        """
+        if not self._authenticated or self._client is None:
+            if not await self.authenticate():
+                raise RuntimeError("Not authenticated with OekoBox Online")
+
+        dates = await self._client.get_dates()
+        return [d for d in dates if isinstance(d, ShopDate)]
+
+    async def _get_pauses(self) -> list[Pause]:
+        """Get all pauses from the API.
+
+        Returns:
+            List of Pause objects
+
+        Raises:
+            RuntimeError: If not authenticated
+        """
+        if not self._authenticated or self._client is None:
+            if not await self.authenticate():
+                raise RuntimeError("Not authenticated with OekoBox Online")
+
+        dates = await self._client.get_dates()
+        return [d for d in dates if isinstance(d, Pause)]
+
+    def _filter_pending_deliveries(
+        self, shop_dates: list[ShopDate]
+    ) -> list[tuple[date_type, ShopDate]]:
+        """Filter and sort pending/active deliveries.
+
+        Args:
+            shop_dates: List of ShopDate objects to filter
+
+        Returns:
+            List of tuples (date, ShopDate) sorted by date
+        """
+        now = dt.now().date()
+        pending_dates = []
+
+        for shop_date in shop_dates:
+            # Filter for pending/in-progress orders (order_state 0 or 1)
+            # and dates that are today or in the future
+            # Also exclude dates with order_id == 0 (no delivery planned)
+            if shop_date.order_state in (0, 1) and shop_date.order_id != 0:
+                date_obj = self._parse_date(shop_date.delivery_date)
+                if date_obj >= now:
+                    pending_dates.append((date_obj, shop_date))
+
+        # Sort by date
+        pending_dates.sort(key=lambda x: x[0])
+        return pending_dates
+
+    async def _find_next_delivery(self) -> tuple[date_type | None, ShopDate | None]:
+        """Find the next pending delivery.
+
+        Returns:
+            Tuple of (delivery_date, shop_date) or (None, None) if no delivery found
+        """
+        shop_dates = await self._get_shop_dates()
+        pending_dates = self._filter_pending_deliveries(shop_dates)
+
+        if pending_dates:
+            return pending_dates[0]
+        return None, None
+
+    def _check_if_paused(self, shop_date: ShopDate | None, pauses: list[Pause]) -> bool:
+        """Check if a delivery is paused.
+
+        Args:
+            shop_date: The ShopDate to check
+            pauses: List of Pause objects from the API
+
+        Returns:
+            True if the delivery is paused, False otherwise
+        """
+        if not shop_date:
+            return False
+
+        # Check if ShopDate has is_paused attribute
+        if hasattr(shop_date, "is_paused") and shop_date.is_paused:
+            return True
+
+        # Check if there's a Pause object matching this delivery
+        delivery_date = self._parse_date(shop_date.delivery_date)
+        for pause in pauses:
+            if hasattr(pause, "delivery_date"):
+                pause_date = self._parse_date(pause.delivery_date)
+                if pause_date == delivery_date:
+                    return True
+            # Some implementations might use date_from/date_to
+            if hasattr(pause, "date_from") and hasattr(pause, "date_to"):
+                date_from = self._parse_date(pause.date_from)
+                date_to = self._parse_date(pause.date_to)
+                if date_from <= delivery_date <= date_to:
+                    return True
+
+        return False
 
     async def authenticate(self) -> bool:
         """Authenticate with the OekoBox provider.
@@ -105,47 +234,12 @@ class OekoBoxProvider(OrganicBoxProvider):
                 raise RuntimeError("Not authenticated with OekoBox Online")
 
         try:
-            # Get delivery dates from the API
-            dates = await self._client.get_dates()
+            # Find the next delivery
+            delivery_date, next_shop_date = await self._find_next_delivery()
 
-            # Find the next delivery date from ShopDate objects
-            # Filter for ShopDate objects with order_state 0 (pending) or 1 (in preparation/delivery)
-            # Exclude order_state 2 (done/past) and -1 (cancelled)
-            from datetime import datetime as dt
-            from datetime import date as date_type
-
-            now = dt.now().date()
-
-            # Filter for ShopDate objects with order_state 0 (pending) or 1 (in preparation/delivery)
-            shop_dates = [d for d in dates if isinstance(d, ShopDate)]
-
-            # Filter for pending/in-progress orders (order_state 0 or 1)
-            # and dates that are today or in the future
-            # Also exclude dates with order_id == 0 (no delivery planned)
-            pending_dates = []
-            for shop_date in shop_dates:
-                if shop_date.order_state in (0, 1) and shop_date.order_id != 0:
-                    # delivery_date should be a datetime.date object
-                    if isinstance(shop_date.delivery_date, date_type):
-                        date_obj = shop_date.delivery_date
-                    elif isinstance(shop_date.delivery_date, dt):
-                        date_obj = shop_date.delivery_date.date()
-                    else:
-                        # Parse if it's a string
-                        date_obj = dt.strptime(
-                            str(shop_date.delivery_date), "%Y-%m-%d"
-                        ).date()
-
-                    if date_obj >= now:
-                        pending_dates.append((date_obj, shop_date))
-
-            # Sort by date and get the earliest one
-            pending_dates.sort(key=lambda x: x[0])
-
-            delivery_date = None
-            next_shop_date = None
-            if pending_dates:
-                delivery_date, next_shop_date = pending_dates[0]
+            # Get pauses to check if delivery is paused
+            pauses = await self._get_pauses()
+            is_paused = self._check_if_paused(next_shop_date, pauses)
 
             # Get orders to find items for the next delivery
             items = []
@@ -236,6 +330,8 @@ class OekoBoxProvider(OrganicBoxProvider):
                 delivery_date=delivery_datetime,
                 items=items,
                 last_order_change=last_order_change,
+                is_paused=is_paused,
+                can_pause=self.supports_pause(),
             )
         except Exception as err:
             _LOGGER.error("Failed to get next delivery: %s", err)
@@ -247,3 +343,112 @@ class OekoBoxProvider(OrganicBoxProvider):
             await self._client.close()
             self._client = None
         self._authenticated = False
+
+    async def pause_next_delivery(self) -> bool:
+        """Pause the next delivery.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._authenticated or self._client is None:
+            if not await self.authenticate():
+                _LOGGER.error("Not authenticated, cannot pause delivery")
+                return False
+
+        try:
+            # Find the next pending delivery
+            delivery_date, next_shop_date = await self._find_next_delivery()
+
+            if not next_shop_date or not delivery_date:
+                _LOGGER.warning("No pending delivery found to pause")
+                return False
+
+            # Use add_pause method with the delivery date
+            # add_pause expects (from_date, to_date) as datetime - pause only this specific date
+            if hasattr(self._client, "add_pause"):
+                # Convert date to datetime
+                from_datetime = dt.combine(delivery_date, dt.min.time())
+                to_datetime = dt.combine(delivery_date, dt.max.time())
+                await self._client.add_pause(from_datetime, to_datetime)
+                _LOGGER.info(
+                    "Paused delivery on %s (order_id %s)",
+                    delivery_date,
+                    next_shop_date.order_id,
+                )
+                return True
+            else:
+                _LOGGER.warning(
+                    "add_pause method not available in pyoekoboxonline library"
+                )
+                return False
+        except Exception as err:
+            _LOGGER.error("Failed to pause delivery: %s", err)
+            return False
+
+    async def unpause_next_delivery(self) -> bool:
+        """Unpause (resume) the next delivery.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self._authenticated or self._client is None:
+            if not await self.authenticate():
+                _LOGGER.error("Not authenticated, cannot unpause delivery")
+                return False
+
+        try:
+            # Find the next delivery
+            delivery_date, next_shop_date = await self._find_next_delivery()
+
+            if not next_shop_date:
+                _LOGGER.warning("No delivery found to unpause")
+                return False
+
+            # Get pauses and check if delivery is paused
+            pauses = await self._get_pauses()
+            if not self._check_if_paused(next_shop_date, pauses):
+                _LOGGER.warning(
+                    "Delivery on %s is not paused, nothing to unpause", delivery_date
+                )
+                return False
+
+            # Find the pause ID for this delivery
+            pause_id = None
+            for pause in pauses:
+                if hasattr(pause, "delivery_date"):
+                    pause_date = self._parse_date(pause.delivery_date)
+                    if pause_date == delivery_date and hasattr(pause, "id"):
+                        pause_id = pause.id
+                        break
+                # Check date range pauses
+                elif hasattr(pause, "date_from") and hasattr(pause, "date_to"):
+                    date_from = self._parse_date(pause.date_from)
+                    date_to = self._parse_date(pause.date_to)
+                    if date_from <= delivery_date <= date_to and hasattr(pause, "id"):
+                        pause_id = pause.id
+                        break
+
+            if pause_id is None:
+                _LOGGER.error(
+                    "Could not find pause ID for delivery on %s", delivery_date
+                )
+                return False
+
+            # Use drop_pause method with the pause ID
+            if hasattr(self._client, "drop_pause"):
+                await self._client.drop_pause(pause_id)
+                _LOGGER.info(
+                    "Unpaused delivery on %s (pause_id %s, order_id %s)",
+                    delivery_date,
+                    pause_id,
+                    next_shop_date.order_id,
+                )
+                return True
+            else:
+                _LOGGER.warning(
+                    "drop_pause method not available in pyoekoboxonline library"
+                )
+                return False
+        except Exception as err:
+            _LOGGER.error("Failed to unpause delivery: %s", err)
+            return False

@@ -110,9 +110,15 @@ class MyProvider(OrganicBoxProvider):
 
             items = []  # Replace with actual items
 
+            # TODO: Determine if delivery is paused (if provider supports it)
+            # is_paused = raw_data.get("is_paused", False)
+            is_paused = False
+
             return DeliveryInfo(
                 delivery_date=delivery_date,
                 items=items,
+                is_paused=is_paused,
+                can_pause=self.supports_pause(),
             )
         except Exception as err:
             _LOGGER.error("Failed to get next delivery from %s: %s", self.name, err)
