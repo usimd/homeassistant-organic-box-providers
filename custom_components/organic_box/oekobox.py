@@ -148,13 +148,16 @@ class OekoBoxProvider(OrganicBoxProvider):
                 else:
                     _LOGGER.debug(
                         "Skipping past delivery: date=%s, order_id=%s, order_state=%s",
-                        date_obj, shop_date.order_id, shop_date.order_state,
+                        date_obj,
+                        shop_date.order_id,
+                        shop_date.order_state,
                     )
             else:
                 _LOGGER.debug(
                     "Skipping delivery: order_state=%s, order_id=%s, delivery_date=%s",
-                    shop_date.order_state, shop_date.order_id,
-                    getattr(shop_date, 'delivery_date', 'N/A'),
+                    shop_date.order_state,
+                    shop_date.order_id,
+                    getattr(shop_date, "delivery_date", "N/A"),
                 )
 
         # Sort by date

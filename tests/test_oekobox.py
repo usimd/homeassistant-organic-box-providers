@@ -156,7 +156,9 @@ async def test_oekobox_provider_get_next_delivery_filters_done_orders(
 
     mock_done_date = MagicMock(spec=ShopDate)
     mock_done_date.order_state = 2  # done/finalized
-    mock_done_date.delivery_date = date.today() - timedelta(days=1)  # past date = delivered
+    mock_done_date.delivery_date = date.today() - timedelta(
+        days=1
+    )  # past date = delivered
     mock_done_date.order_id = 100
 
     mock_pending_date = MagicMock(spec=ShopDate)
@@ -209,7 +211,10 @@ async def test_oekobox_provider_get_next_delivery_includes_finalized_future_orde
     mock_pending_date.order_id = 8937340
     mock_pending_date.last_order_change = None
 
-    mock_oekobox_client.get_dates.return_value = [mock_finalized_date, mock_pending_date]
+    mock_oekobox_client.get_dates.return_value = [
+        mock_finalized_date,
+        mock_pending_date,
+    ]
     mock_oekobox_client.get_order_items.return_value = []
 
     provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
