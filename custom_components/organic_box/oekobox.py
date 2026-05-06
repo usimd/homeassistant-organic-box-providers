@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
 from pyoekoboxonline.exceptions import OekoboxAPIError
 from pyoekoboxonline.models import Pause, ShopDate, XUnit
@@ -128,17 +129,33 @@ class OekoBoxProvider(OrganicBoxProvider):
         Returns:
             List of tuples (date, ShopDate) sorted by date
         """
-        now = dt.now().date()
+        now = dt_util.now().date()
         pending_dates = []
 
         for shop_date in shop_dates:
-            # Filter for pending/in-progress orders (order_state 0 or 1)
-            # and dates that are today or in the future
-            # Also exclude dates with order_id == 0 (no delivery planned)
-            if shop_date.order_state in (0, 1) and shop_date.order_id != 0:
+            # Filter for orders with valid order_id (!= 0) and future/today dates.
+            # order_state values:
+            #   0 = pending/editable
+            #   1 = in preparation
+            #   2 = finalized (past edit deadline, but not yet delivered for future dates)
+            #  -1 = cancelled
+            # We include states 0, 1, and 2 because state 2 for future dates means
+            # "locked/finalized" (past order deadline), not "delivered".
+            if shop_date.order_state in (0, 1, 2) and shop_date.order_id != 0:
                 date_obj = self._parse_date(shop_date.delivery_date)
                 if date_obj >= now:
                     pending_dates.append((date_obj, shop_date))
+                else:
+                    _LOGGER.debug(
+                        "Skipping past delivery: date=%s, order_id=%s, order_state=%s",
+                        date_obj, shop_date.order_id, shop_date.order_state,
+                    )
+            else:
+                _LOGGER.debug(
+                    "Skipping delivery: order_state=%s, order_id=%s, delivery_date=%s",
+                    shop_date.order_state, shop_date.order_id,
+                    getattr(shop_date, 'delivery_date', 'N/A'),
+                )
 
         # Sort by date
         pending_dates.sort(key=lambda x: x[0])

@@ -101,13 +101,15 @@ async def test_oekobox_provider_get_next_delivery_with_dates(
     mock_oekobox_online,
 ):
     """Test getting next delivery with dates."""
-    from datetime import date
+    from datetime import date, timedelta
     from pyoekoboxonline.models import ShopDate
+
+    future_date = date.today() + timedelta(days=14)
 
     # Mock ShopDate object with order_state 0 (pending)
     mock_shop_date = MagicMock(spec=ShopDate)
     mock_shop_date.order_state = 0  # pending
-    mock_shop_date.delivery_date = date(2025, 11, 15)
+    mock_shop_date.delivery_date = future_date
     mock_shop_date.order_id = 123
 
     mock_oekobox_client.get_dates.return_value = [mock_shop_date]
@@ -120,7 +122,7 @@ async def test_oekobox_provider_get_next_delivery_with_dates(
 
     assert isinstance(delivery_info, DeliveryInfo)
     assert delivery_info.delivery_date is not None
-    assert delivery_info.delivery_date.date() == date(2025, 11, 15)
+    assert delivery_info.delivery_date.date() == future_date
 
 
 @pytest.mark.unit
@@ -145,16 +147,16 @@ async def test_oekobox_provider_get_next_delivery_filters_done_orders(
     mock_oekobox_client,
     mock_oekobox_online,
 ):
-    """Test that done orders (order_state=2) are filtered out."""
+    """Test that done orders (order_state=2) with past dates are filtered out."""
     from datetime import date, timedelta
     from pyoekoboxonline.models import ShopDate
 
-    # Mock ShopDate objects: one done (order_state=2), one pending (order_state=0)
+    # Mock ShopDate objects: one done with past date (order_state=2), one pending (order_state=0)
     future_date = date.today() + timedelta(days=7)
 
     mock_done_date = MagicMock(spec=ShopDate)
-    mock_done_date.order_state = 2  # done
-    mock_done_date.delivery_date = date.today() - timedelta(days=1)
+    mock_done_date.order_state = 2  # done/finalized
+    mock_done_date.delivery_date = date.today() - timedelta(days=1)  # past date = delivered
     mock_done_date.order_id = 100
 
     mock_pending_date = MagicMock(spec=ShopDate)
@@ -173,6 +175,52 @@ async def test_oekobox_provider_get_next_delivery_filters_done_orders(
     assert isinstance(delivery_info, DeliveryInfo)
     assert delivery_info.delivery_date is not None
     assert delivery_info.delivery_date.date() == future_date
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_get_next_delivery_includes_finalized_future_orders(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test that finalized orders (order_state=2) with future dates are included.
+
+    order_state=2 for a future delivery date means the order is past the edit
+    deadline (locked/finalized) but not yet delivered. It should be shown as the
+    next delivery.
+    """
+    from datetime import date, timedelta
+    from pyoekoboxonline.models import ShopDate
+
+    tomorrow = date.today() + timedelta(days=1)
+    next_week = date.today() + timedelta(days=8)
+
+    # Finalized order for tomorrow (past edit deadline, but delivery is tomorrow)
+    mock_finalized_date = MagicMock(spec=ShopDate)
+    mock_finalized_date.order_state = 2  # finalized
+    mock_finalized_date.delivery_date = tomorrow
+    mock_finalized_date.order_id = 8937924
+    mock_finalized_date.last_order_change = None
+
+    # Pending order for next week
+    mock_pending_date = MagicMock(spec=ShopDate)
+    mock_pending_date.order_state = 0  # pending
+    mock_pending_date.delivery_date = next_week
+    mock_pending_date.order_id = 8937340
+    mock_pending_date.last_order_change = None
+
+    mock_oekobox_client.get_dates.return_value = [mock_finalized_date, mock_pending_date]
+    mock_oekobox_client.get_order_items.return_value = []
+
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
+
+    delivery_info = await provider.get_next_delivery()
+
+    assert isinstance(delivery_info, DeliveryInfo)
+    assert delivery_info.delivery_date is not None
+    # Should return tomorrow's finalized order, not next week's pending one
+    assert delivery_info.delivery_date.date() == tomorrow
 
 
 @pytest.mark.unit

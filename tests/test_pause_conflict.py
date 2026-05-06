@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -86,8 +86,8 @@ async def test_pause_conflict_with_auto_cancel_enabled(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
-    delivery_date = datetime(2025, 11, 15).date()
+    # Mock get_dates to return a shop date
+    delivery_date = date.today() + timedelta(days=7)
     shop_date = ShopDate(
         delivery_date=delivery_date,
         order_id=123,
@@ -148,8 +148,8 @@ async def test_pause_conflict_without_auto_cancel(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
-    delivery_date = datetime(2025, 11, 15).date()
+    # Mock get_dates to return a shop date
+    delivery_date = date.today() + timedelta(days=7)
     shop_date = ShopDate(
         delivery_date=delivery_date,
         order_id=123,
@@ -202,8 +202,8 @@ async def test_pause_success_without_conflict(
     provider._client = mock_client
     provider._authenticated = True
 
-    # Mock get_dates to return a shop date (Friday, Nov 15, 2025)
-    delivery_date = datetime(2025, 11, 15).date()
+    # Mock get_dates to return a shop date
+    delivery_date = date.today() + timedelta(days=7)
     shop_date = ShopDate(
         delivery_date=delivery_date,
         order_id=123,
@@ -257,7 +257,7 @@ async def test_pause_conflict_retry_fails(
 
     # Mock get_dates to return a shop date
     shop_date = ShopDate(
-        delivery_date=datetime(2025, 11, 15).date(),
+        delivery_date=date.today() + timedelta(days=7),
         order_id=123,
         order_state=0,
     )
@@ -301,7 +301,7 @@ async def test_pause_non_409_error(
 
     # Mock get_dates to return a shop date
     shop_date = ShopDate(
-        delivery_date=datetime(2025, 11, 15).date(),
+        delivery_date=date.today() + timedelta(days=7),
         order_id=123,
         order_state=0,
     )
