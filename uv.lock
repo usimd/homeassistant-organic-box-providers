@@ -7,33 +7,6 @@ resolution-markers = [
 ]
 
 [[package]]
-name = ""
-version = "0.0.1"
-source = { virtual = "." }
-dependencies = [
-    { name = "pyoekoboxonline" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "homeassistant" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-homeassistant-custom-component" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pyoekoboxonline", specifier = "==0.1.0b5" }]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "homeassistant", specifier = ">=2025.10.0" },
-    { name = "pre-commit", specifier = ">=4.3" },
-    { name = "pytest", specifier = ">=8" },
-    { name = "pytest-homeassistant-custom-component", specifier = ">=0.13.260" },
-]
-
-[[package]]
 name = "acme"
 version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1144,6 +1117,33 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d0/13/b1bc15ea526cb94e3ce5b20d766e64cc11d1c3e5f92e134b5452439aaa34/homeassistant-2025.10.4.tar.gz", hash = "sha256:51ed406adf1a4845c7512225da38b5710699127551818efe3c11c1f6640127a2", size = 28395635, upload-time = "2025-10-24T20:19:03.835Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/43/e9/245625b902a20285d216af53b0c79f8dada2790ce16dd0ed599ba51c0286/homeassistant-2025.10.4-py3-none-any.whl", hash = "sha256:c5fff7a617c721b06de3ccd58e3d1c453a42ee3f5000688cd587bcd8fca9df37", size = 47797907, upload-time = "2025-10-24T20:18:57.421Z" },
+]
+
+[[package]]
+name = "homeassistant-organic-box-providers"
+version = "0.0.1"
+source = { virtual = "." }
+dependencies = [
+    { name = "pyoekoboxonline" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "homeassistant" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-homeassistant-custom-component" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyoekoboxonline", specifier = "==0.1.0b5" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "homeassistant", specifier = ">=2025.10.0" },
+    { name = "pre-commit", specifier = ">=4.3" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-homeassistant-custom-component", specifier = ">=0.13.260" },
 ]
 
 [[package]]
