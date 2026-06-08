@@ -9,6 +9,10 @@
     {
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "automerge": true
+    },
+    {
+      "matchDepTypes": ["python"],
+      "allowedVersions": "~3.13"
     }
   ]
 }
