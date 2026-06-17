@@ -286,9 +286,12 @@ class OekoBoxProvider(OrganicBoxProvider):
         Returns:
             DeliveryInfo object containing delivery date and items
         """
-        if not self._authenticated or self._client is None:
-            if not await self.authenticate():
-                raise RuntimeError("Not authenticated with OekoBox Online")
+        # Always re-authenticate before fetching to obtain a fresh server session.
+        # The dates7 API endpoint caches responses per session ID server-side, so
+        # reusing the same session across polls returns stale data even after orders
+        # are placed or changed.
+        if not await self.authenticate():
+            raise RuntimeError("Not authenticated with OekoBox Online")
 
         try:
             # Find the next delivery
