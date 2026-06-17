@@ -98,7 +98,9 @@ class ShoppingListMatcher:
         Returns:
             True if shopping list is available
         """
-        return SHOPPING_LIST_DOMAIN in self._hass.data
+        # Use the services registry — more reliable than checking hass.data directly
+        # since hass.data[DOMAIN] is only set after async_setup_entry completes.
+        return self._hass.services.has_service(SHOPPING_LIST_DOMAIN, "complete_item")
 
     async def get_shopping_list_items(self) -> list[dict]:
         """Get items from Home Assistant shopping list.

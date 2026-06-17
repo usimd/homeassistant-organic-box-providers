@@ -57,7 +57,7 @@ def test_get_similarity():
 @pytest.mark.asyncio
 async def test_is_shopping_list_available_not_present(matcher, mock_hass):
     """Test checking if shopping list is available when it's not."""
-    mock_hass.data = {}
+    mock_hass.services.has_service.return_value = False
     available = await matcher.is_shopping_list_available()
     assert available is False
 
@@ -65,7 +65,7 @@ async def test_is_shopping_list_available_not_present(matcher, mock_hass):
 @pytest.mark.asyncio
 async def test_is_shopping_list_available(matcher, mock_hass):
     """Test checking if shopping list is available."""
-    mock_hass.data = {"shopping_list": {}}
+    mock_hass.services.has_service.return_value = True
     available = await matcher.is_shopping_list_available()
     assert available is True
 

@@ -58,8 +58,8 @@
         "name": "Last order change time"
       }
     },
-    "switch": {
-      "delivery_pause": {
+    "button": {
+      "pause_delivery": {
         "name": "Pause next delivery"
       }
     }

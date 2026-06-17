@@ -24,6 +24,9 @@ class DeliveryInfo:
     last_order_change: datetime | None = None  # Time until order can be changed
     is_paused: bool = False  # Whether the next delivery is paused
     can_pause: bool = False  # Whether the provider supports pausing
+    order_state: int | None = (
+        None  # Raw order state: 0=editable, 1=in preparation, 2=finalized
+    )
 
     def __post_init__(self):
         """Calculate total items if not provided."""

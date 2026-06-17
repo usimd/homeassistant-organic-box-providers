@@ -98,8 +98,11 @@ class OrganicBoxDataUpdateCoordinator(DataUpdateCoordinator[DeliveryInfo]):
                         delivery_info.items
                     )
 
-                    # Mark matched items as delivered
-                    if self.matched_items:
+                    # Mark matched items as complete only when the order is confirmed
+                    # and in preparation (order_state=1). At state 0 the order is still
+                    # editable, so we match for display but don't clean up the shopping
+                    # list yet — otherwise items would be ticked off before we shop.
+                    if self.matched_items and delivery_info.order_state == 1:
                         await self.shopping_list_matcher.mark_items_as_delivered(
                             self.matched_items, delivery_info.delivery_date
                         )

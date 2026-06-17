@@ -410,8 +410,12 @@ async def test_oekobox_provider_check_if_paused_with_date_range(
 
     # Pause covering the delivery date
     mock_pause = MagicMock(spec=Pause)
-    mock_pause.start_date = datetime.datetime.combine(future_date - timedelta(days=2), datetime.time())
-    mock_pause.end_date = datetime.datetime.combine(future_date + timedelta(days=2), datetime.time())
+    mock_pause.start_date = datetime.datetime.combine(
+        future_date - timedelta(days=2), datetime.time()
+    )
+    mock_pause.end_date = datetime.datetime.combine(
+        future_date + timedelta(days=2), datetime.time()
+    )
     del mock_pause.delivery_date  # Pause model has no delivery_date attribute
 
     mock_oekobox_client.get_dates.return_value = [mock_shop_date, mock_pause]
