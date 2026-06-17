@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 from pyoekoboxonline import OekoboxClient as OekoBoxOnline
-from pyoekoboxonline.exceptions import OekoboxAPIError
+from pyoekoboxonline.exceptions import OekoboxAPIError, OekoboxAuthenticationError
 from pyoekoboxonline.models import Pause, ShopDate, XUnit
 
 from .const import CONF_AUTO_CANCEL_ON_PAUSE_CONFLICT
@@ -99,7 +99,14 @@ class OekoBoxProvider(OrganicBoxProvider):
             if not await self.authenticate():
                 raise RuntimeError("Not authenticated with OekoBox Online")
 
-        dates = await self._client.get_dates()
+        try:
+            dates = await self._client.get_dates()
+        except OekoboxAuthenticationError:
+            _LOGGER.debug("Session expired, re-authenticating")
+            self._authenticated = False
+            if not await self.authenticate():
+                raise RuntimeError("Re-authentication failed")
+            dates = await self._client.get_dates()
         return [d for d in dates if isinstance(d, ShopDate)]
 
     async def _get_pauses(self) -> list[Pause]:
@@ -115,7 +122,14 @@ class OekoBoxProvider(OrganicBoxProvider):
             if not await self.authenticate():
                 raise RuntimeError("Not authenticated with OekoBox Online")
 
-        dates = await self._client.get_dates()
+        try:
+            dates = await self._client.get_dates()
+        except OekoboxAuthenticationError:
+            _LOGGER.debug("Session expired, re-authenticating")
+            self._authenticated = False
+            if not await self.authenticate():
+                raise RuntimeError("Re-authentication failed")
+            dates = await self._client.get_dates()
         return [d for d in dates if isinstance(d, Pause)]
 
     def _filter_pending_deliveries(
