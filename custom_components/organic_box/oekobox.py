@@ -133,7 +133,7 @@ class OekoBoxProvider(OrganicBoxProvider):
         pending_dates = []
 
         for shop_date in shop_dates:
-            # Filter for orders with valid order_id (!= 0) and future/today dates.
+            # Filter for orders with valid order_id (> 0) and future/today dates.
             # order_state values:
             #   0 = pending/editable
             #   1 = in preparation
@@ -141,7 +141,11 @@ class OekoBoxProvider(OrganicBoxProvider):
             #  -1 = cancelled
             # We include states 0, 1, and 2 because state 2 for future dates means
             # "locked/finalized" (past order deadline), not "delivered".
-            if shop_date.order_state in (0, 1, 2) and shop_date.order_id != 0:
+            # order_id values:
+            #   > 0 = real order exists
+            #   0   = no order placed yet (empty slot)
+            #  -1   = subscription placeholder (will auto-create an order later)
+            if shop_date.order_state in (0, 1, 2) and shop_date.order_id > 0:
                 date_obj = self._parse_date(shop_date.delivery_date)
                 if date_obj >= now:
                     pending_dates.append((date_obj, shop_date))
@@ -201,12 +205,13 @@ class OekoBoxProvider(OrganicBoxProvider):
                 pause_date = self._parse_date(pause.delivery_date)
                 if pause_date == delivery_date:
                     return True
-            # Some implementations might use date_from/date_to
-            if hasattr(pause, "date_from") and hasattr(pause, "date_to"):
-                date_from = self._parse_date(pause.date_from)
-                date_to = self._parse_date(pause.date_to)
-                if date_from <= delivery_date <= date_to:
-                    return True
+            # Pause model uses start_date/end_date for the date range
+            if hasattr(pause, "start_date") and hasattr(pause, "end_date"):
+                if pause.start_date and pause.end_date:
+                    date_from = self._parse_date(pause.start_date)
+                    date_to = self._parse_date(pause.end_date)
+                    if date_from <= delivery_date <= date_to:
+                        return True
 
         return False
 

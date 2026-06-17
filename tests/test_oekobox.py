@@ -151,14 +151,14 @@ async def test_oekobox_provider_get_next_delivery_filters_done_orders(
     from datetime import date, timedelta
     from pyoekoboxonline.models import ShopDate
 
-    # Mock ShopDate objects: one done with past date (order_state=2), one pending (order_state=0)
+    # Use a date far in the past to ensure it's always before dt_util.now()
+    # regardless of any time mocking in the HA test framework.
+    far_past_date = date(2020, 1, 1)
     future_date = date.today() + timedelta(days=7)
 
     mock_done_date = MagicMock(spec=ShopDate)
     mock_done_date.order_state = 2  # done/finalized
-    mock_done_date.delivery_date = date.today() - timedelta(
-        days=1
-    )  # past date = delivered
+    mock_done_date.delivery_date = far_past_date  # always in the past
     mock_done_date.order_id = 100
 
     mock_pending_date = MagicMock(spec=ShopDate)
@@ -346,6 +346,84 @@ async def test_oekobox_provider_get_next_delivery_filters_no_delivery_planned(
     assert delivery_info.delivery_date is not None
     # Should return the date with order_id=123, not the one with order_id=0
     assert delivery_info.delivery_date.date() == future_date + timedelta(days=1)
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_get_next_delivery_filters_subscription_placeholder(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test that dates with order_id=-1 (subscription placeholder, no order yet) are filtered out."""
+    from datetime import date, timedelta
+    from pyoekoboxonline.models import ShopDate
+
+    future_date = date.today() + timedelta(days=7)
+
+    # order_id=-1 means a subscription is planned but no actual order exists yet
+    mock_subscription_placeholder = MagicMock(spec=ShopDate)
+    mock_subscription_placeholder.order_state = 0
+    mock_subscription_placeholder.delivery_date = future_date
+    mock_subscription_placeholder.order_id = -1
+
+    # Actual order for a later date
+    mock_delivery_date = MagicMock(spec=ShopDate)
+    mock_delivery_date.order_state = 0
+    mock_delivery_date.delivery_date = future_date + timedelta(days=14)
+    mock_delivery_date.order_id = 123
+
+    mock_oekobox_client.get_dates.return_value = [
+        mock_subscription_placeholder,
+        mock_delivery_date,
+    ]
+    mock_oekobox_client.get_order_items.return_value = []
+
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
+
+    delivery_info = await provider.get_next_delivery()
+
+    assert isinstance(delivery_info, DeliveryInfo)
+    assert delivery_info.delivery_date is not None
+    # Should skip the placeholder and return the real order date
+    assert delivery_info.delivery_date.date() == future_date + timedelta(days=14)
+
+
+@pytest.mark.unit
+async def test_oekobox_provider_check_if_paused_with_date_range(
+    hass: HomeAssistant,
+    mock_oekobox_client,
+    mock_oekobox_online,
+):
+    """Test that _check_if_paused correctly uses start_date/end_date from Pause model."""
+    import datetime
+    from datetime import date, timedelta
+    from pyoekoboxonline.models import Pause, ShopDate
+
+    future_date = date.today() + timedelta(days=7)
+
+    mock_shop_date = MagicMock(spec=ShopDate)
+    mock_shop_date.order_state = 0
+    mock_shop_date.delivery_date = future_date
+    mock_shop_date.order_id = 123
+    mock_shop_date.last_order_change = None
+
+    # Pause covering the delivery date
+    mock_pause = MagicMock(spec=Pause)
+    mock_pause.start_date = datetime.datetime.combine(future_date - timedelta(days=2), datetime.time())
+    mock_pause.end_date = datetime.datetime.combine(future_date + timedelta(days=2), datetime.time())
+    del mock_pause.delivery_date  # Pause model has no delivery_date attribute
+
+    mock_oekobox_client.get_dates.return_value = [mock_shop_date, mock_pause]
+    mock_oekobox_client.get_order_items.return_value = []
+
+    provider = OekoBoxProvider(hass, "test@example.com", "password", "shop123")
+    await provider.authenticate()
+
+    delivery_info = await provider.get_next_delivery()
+
+    assert isinstance(delivery_info, DeliveryInfo)
+    assert delivery_info.is_paused is True
 
 
 @pytest.mark.unit
